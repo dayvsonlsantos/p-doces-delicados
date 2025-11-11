@@ -1,0 +1,398 @@
+// pages/batch.js - completo com arredondamento
+import Layout from '../../../components/Layout/Layout'
+import GlassCard from '../../../components/UI/GlassCard'
+import GlassButton from '../../../components/UI/GlassButton'
+import { useState, useEffect } from 'react'
+import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+
+// Função de arredondamento para gramas
+const roundGrams = (grams) => {
+  // Arredondamento: 0.5+ → 1g, menos → 0g
+  return grams >= 0.5 ? Math.round(grams) : 0
+}
+
+export default function BatchCalculator() {
+  const [candies, setCandies] = useState([])
+  const [masses, setMasses] = useState([])
+  const [products, setProducts] = useState([])
+  const [selectedCandies, setSelectedCandies] = useState({})
+  const [calculations, setCalculations] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [expandedSections, setExpandedSections] = useState({
+    candies: false,
+    masses: false,
+    summary: false
+  })
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const [candiesRes, massesRes, productsRes] = await Promise.all([
+        fetch('/api/candies'),
+        fetch('/api/masses'),
+        fetch('/api/products')
+      ])
+
+      setCandies(await candiesRes.json())
+      setMasses(await massesRes.json())
+      setProducts(await productsRes.json())
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
+
+  const updateQuantity = (candyId, quantity) => {
+    setSelectedCandies(prev => ({
+      ...prev,
+      [candyId]: Math.max(0, quantity)
+    }))
+  }
+
+  // Função para calcular ingredientes totais de uma massa com arredondamento
+  const calculateMassIngredients = (mass, totalGrams) => {
+    const scaleFactor = totalGrams / mass.totalGrams
+    const ingredients = {}
+
+    mass.ingredients?.forEach(ingredient => {
+      const product = products.find(p => p._id === ingredient.productId)
+      if (product) {
+        let scaledGrams = ingredient.grams * scaleFactor
+        // Aplicar arredondamento
+        scaledGrams = roundGrams(scaledGrams)
+        
+        // Só adiciona se tiver pelo menos 0.5g (que vira 1g)
+        if (scaledGrams >= 0.5) {
+          ingredients[product.name] = {
+            grams: scaledGrams,
+            product: product
+          }
+        }
+      }
+    })
+
+    return ingredients
+  }
+
+  const calculateBatch = () => {
+    const candyDetails = []
+    const massGroups = {}
+    let totalCost = 0
+    let totalRevenue = 0
+    let totalProfit = 0
+
+    // Processar cada docinho selecionado
+    Object.entries(selectedCandies).forEach(([candyId, quantity]) => {
+      if (quantity > 0) {
+        const candy = candies.find(c => c._id === candyId)
+        if (candy) {
+          const candyCost = candy.costPerUnit || 0
+          const candyRevenue = candy.salePrice ? parseFloat(candy.salePrice) * quantity : 0
+          const candyProfit = candyRevenue - (candyCost * quantity)
+
+          // Detalhes do docinho
+          candyDetails.push({
+            candy,
+            quantity,
+            totalCost: candyCost * quantity,
+            totalRevenue: candyRevenue,
+            totalProfit: candyProfit
+          })
+
+          totalCost += candyCost * quantity
+          totalRevenue += candyRevenue
+          totalProfit += candyProfit
+
+          // Agrupar por massa (suporta múltiplas massas)
+          const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
+
+          candyMasses.forEach(massItem => {
+            if (massItem.massName && massItem.grams) {
+              const mass = masses.find(m => m.name === massItem.massName)
+              if (mass) {
+                if (!massGroups[massItem.massName]) {
+                  massGroups[massItem.massName] = {
+                    mass: mass,
+                    totalGrams: 0,
+                    candies: []
+                  }
+                }
+
+                let massGrams = massItem.grams * quantity
+                // Aplicar arredondamento no total por massa
+                massGrams = roundGrams(massGrams)
+                
+                massGroups[massItem.massName].totalGrams += massGrams
+                massGroups[massItem.massName].candies.push({
+                  candy: candy,
+                  quantity: quantity,
+                  grams: massGrams
+                })
+              }
+            }
+          })
+        }
+      }
+    })
+
+    setCalculations({
+      candyDetails,
+      massGroups,
+      totalCost: totalCost.toFixed(2),
+      totalRevenue: totalRevenue.toFixed(2),
+      totalProfit: totalProfit.toFixed(2)
+    })
+  }
+
+  const printResults = () => {
+    window.print()
+  }
+
+  return (
+    <Layout activePage="batch">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-primary mb-2">Calculadora de Lote</h1>
+        <p className="text-secondary">Calcule os ingredientes necessários agrupando massas iguais</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Seleção de Docinhos */}
+        <GlassCard>
+          <h2 className="text-2xl font-bold text-primary mb-4 flex items-center gap-2">
+            <FaCalculator />
+            Selecionar Docinhos
+          </h2>
+
+          <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+            {candies.map(candy => (
+              <div key={candy._id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 dark:bg-gray-800/50">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-primary">{candy.name}</h3>
+                  <p className="text-secondary text-sm">
+                    {candy.candyGrams}g • {candy.masses ? `${candy.masses.length} massa(s)` : '1 massa'}
+                  </p>
+                  {candy.salePrice && (
+                    <p className="text-green-500 text-sm font-semibold">
+                      Venda: R$ {parseFloat(candy.salePrice).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) - 1)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
+                  >
+                    <FaMinus size={12} />
+                  </button>
+
+                  <input
+                    type="number"
+                    value={selectedCandies[candy._id] || 0}
+                    onChange={(e) => updateQuantity(candy._id, parseInt(e.target.value) || 0)}
+                    className="w-16 text-center glass-input"
+                    min="0"
+                  />
+
+                  <button
+                    onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) + 1)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/20 text-green-500 hover:bg-green-500/30 transition-colors"
+                  >
+                    <FaPlus size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <GlassButton
+            onClick={calculateBatch}
+            className="w-full mt-6"
+            disabled={Object.values(selectedCandies).every(qty => qty === 0)}
+          >
+            <FaCalculator />
+            Calcular Lote
+          </GlassButton>
+        </GlassCard>
+
+        {/* Resultados */}
+        <GlassCard>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-primary">Resultados do Lote</h2>
+            {calculations && (
+              <GlassButton onClick={printResults} variant="secondary">
+                <FaPrint />
+                Imprimir
+              </GlassButton>
+            )}
+          </div>
+
+          {calculations ? (
+            <div className="space-y-4">
+              {/* Resumo Financeiro */}
+              <div
+                className="cursor-pointer"
+                onClick={() => toggleSection('summary')}
+              >
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                  <h3 className="font-bold text-primary">Resumo Financeiro</h3>
+                  {expandedSections.summary ? <FaChevronUp /> : <FaChevronDown />}
+                </div>
+              </div>
+
+              {expandedSections.summary && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white/5 rounded-2xl">
+                  <div className="text-center">
+                    <p className="text-orange-300 text-sm font-semibold">Custo Total</p>
+                    <p className="text-orange-400 text-2xl font-bold">R$ {calculations.totalCost}</p>
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-blue-300 text-sm font-semibold">Receita Total</p>
+                    <p className="text-blue-400 text-2xl font-bold">R$ {calculations.totalRevenue}</p>
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-green-300 text-sm font-semibold">Lucro Total</p>
+                    <p className="text-green-400 text-2xl font-bold">R$ {calculations.totalProfit}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Docinhos */}
+              <div
+                className="cursor-pointer"
+                onClick={() => toggleSection('candies')}
+              >
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20">
+                  <h3 className="font-bold text-primary">Docinhos do Lote</h3>
+                  {expandedSections.candies ? <FaChevronUp /> : <FaChevronDown />}
+                </div>
+              </div>
+
+              {expandedSections.candies && (
+                <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
+                  {calculations.candyDetails.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
+                      <div>
+                        <span className="text-primary font-semibold">{item.candy.name}</span>
+                        <div className="text-secondary text-xs">
+                          {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-green-400 font-semibold">
+                          R$ {item.totalRevenue.toFixed(2)}
+                        </div>
+                        <div className="text-green-300 text-xs">
+                          Lucro: R$ {item.totalProfit.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Massas Agrupadas */}
+              <div
+                className="cursor-pointer"
+                onClick={() => toggleSection('masses')}
+              >
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-green-500/10 border border-green-500/20">
+                  <h3 className="font-bold text-primary">Massas Agrupadas</h3>
+                  {expandedSections.masses ? <FaChevronUp /> : <FaChevronDown />}
+                </div>
+              </div>
+
+              {expandedSections.masses && (
+                <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
+                  {Object.entries(calculations.massGroups).map(([massName, massData]) => {
+                    // Filtrar apenas massas que têm pelo menos 1g após arredondamento
+                    if (massData.totalGrams < 0.5) {
+                      return null
+                    }
+
+                    const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
+                    // Filtrar ingredientes que têm pelo menos 1g após arredondamento
+                    const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+
+                    return (
+                      <div key={massName} className="p-4 rounded-xl bg-white/5">
+                        <h4 className="font-bold text-primary mb-3">{massName}</h4>
+
+                        <div className="mb-3">
+                          <p className="text-secondary text-sm mb-2">
+                            Total necessário: <strong>{roundGrams(massData.totalGrams)}g</strong>
+                          </p>
+                          <p className="text-secondary text-xs">Docinhos que usam esta massa:</p>
+                          <div className="space-y-1 mt-1">
+                            {massData.candies.map((candyItem, idx) => (
+                              <div key={idx} className="flex justify-between text-xs text-white/60">
+                                <span>{candyItem.candy.name}</span>
+                                <span>
+                                  {candyItem.quantity} un • {roundGrams(candyItem.grams)}g
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {validIngredients.length > 0 ? (
+                          <div>
+                            <p className="text-secondary text-sm mb-2">Ingredientes necessários:</p>
+                            <div className="space-y-2">
+                              {validIngredients.map(([productName, data]) => (
+                                <div key={productName} className="flex justify-between text-sm">
+                                  <span className="text-white">{productName}</span>
+                                  <span className="text-primary-300 font-semibold">
+                                    {roundGrams(data.grams)}g
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-secondary text-sm text-center py-2">
+                            Quantidades muito pequenas após arredondamento
+                          </p>
+                        )}
+                      </div>
+                    )
+                  }).filter(Boolean) /* Remove null values */}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500 mx-auto mb-4">
+                <FaCalculator size={24} />
+              </div>
+              <p className="text-secondary">Selecione os docinhos e clique em calcular</p>
+            </div>
+          )}
+        </GlassCard>
+      </div>
+
+      {/* Informação sobre arredondamento */}
+      {calculations && (
+        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+          <p className="text-blue-300 text-sm text-center">
+            💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g são considerados 0g, 
+            valores de 0.5g ou mais são arredondados para o inteiro mais próximo.
+          </p>
+        </div>
+      )}
+    </Layout>
+  )
+}
