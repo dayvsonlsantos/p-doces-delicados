@@ -1,3 +1,4 @@
+// pages/index.js (Dashboard)
 import Layout from '../components/Layout/Layout'
 import GlassCard from '../components/UI/GlassCard'
 import { useState, useEffect } from 'react'
@@ -6,7 +7,7 @@ import {
   FaArrowRight, FaWeight, FaIceCream, 
   FaCalculator
 } from 'react-icons/fa'
-import { useRouter } from 'next/router' // Importar useRouter
+import { useRouter } from 'next/router'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ 
@@ -19,7 +20,7 @@ export default function Dashboard() {
     cakes: 0
   })
 
-  const router = useRouter() // Usar o router
+  const router = useRouter()
 
   useEffect(() => {
     loadStats()
@@ -54,7 +55,6 @@ export default function Dashboard() {
     }
   }
 
-  // Função para navegação
   const navigateTo = (path) => {
     router.push(path)
   }
@@ -62,18 +62,22 @@ export default function Dashboard() {
   const QuickActionCard = ({ icon: Icon, title, description, path, color }) => (
     <div 
       className="cursor-pointer"
-      onClick={() => navigateTo(path)} // Usar a função de navegação
+      onClick={() => navigateTo(path)}
     >
-      <GlassCard className="hover:scale-105 transition-transform duration-300 group h-full">
+      <GlassCard className="hover:scale-105 transition-transform duration-300 h-full btn-mobile">
         <div className="text-center">
-          <div className={`w-16 h-16 rounded-2xl ${color} flex items-center justify-center text-white mx-auto mb-4 group-hover:scale-110 transition-transform`}>
-            <Icon size={24} />
+          <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl ${color} flex items-center justify-center text-white mx-auto mb-3 md:mb-4 group-hover:scale-110 transition-transform`}>
+            <Icon size={20} className="md:w-6 md:h-6" />
           </div>
-          <h3 className="font-bold text-primary mb-2 group-hover:text-blue-500 transition-colors">{title}</h3>
-          <p className="text-secondary text-sm mb-3">{description}</p>
-          <div className="flex items-center justify-center text-blue-500 text-sm font-semibold">
+          <h3 className="font-bold text-primary mb-2 text-sm md:text-base group-hover:text-blue-500 transition-colors">
+            {title}
+          </h3>
+          <p className="text-secondary text-xs md:text-sm mb-3 leading-tight">
+            {description}
+          </p>
+          <div className="flex items-center justify-center text-blue-500 text-xs md:text-sm font-semibold">
             <span>Acessar</span>
-            <FaArrowRight size={12} className="ml-1 group-hover:translate-x-1 transition-transform" />
+            <FaArrowRight size={10} className="ml-1 group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
       </GlassCard>
@@ -82,69 +86,73 @@ export default function Dashboard() {
 
   return (
     <Layout activePage="dashboard">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-primary mb-2">Dashboard</h1>
-        <p className="text-secondary">Gerencie sua confeitaria de forma inteligente</p>
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold text-primary mb-2 text-mobile-lg">
+          Dashboard
+        </h1>
+        <p className="text-secondary text-sm md:text-base">
+          Gerencie sua confeitaria de forma inteligente
+        </p>
       </div>
 
-      {/* Estatísticas Gerais */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center text-white">
-              <FaBox size={20} />
+      {/* Estatísticas Gerais - Grid responsivo */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+        <GlassCard className="p-3 md:p-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-green-500 flex items-center justify-center text-white">
+              <FaBox size={16} className="md:w-5 md:h-5" />
             </div>
             <div>
-              <p className="text-secondary text-sm">Produtos</p>
-              <p className="text-2xl font-bold text-primary">{stats.products}</p>
+              <p className="text-secondary text-xs md:text-sm">Produtos</p>
+              <p className="text-xl md:text-2xl font-bold text-primary">{stats.products}</p>
             </div>
           </div>
         </GlassCard>
 
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500 flex items-center justify-center text-white">
-              <FaTag size={20} />
+        <GlassCard className="p-3 md:p-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-purple-500 flex items-center justify-center text-white">
+              <FaTag size={16} className="md:w-5 md:h-5" />
             </div>
             <div>
-              <p className="text-secondary text-sm">Insumos</p>
-              <p className="text-2xl font-bold text-primary">{stats.supplies}</p>
+              <p className="text-secondary text-xs md:text-sm">Insumos</p>
+              <p className="text-xl md:text-2xl font-bold text-primary">{stats.supplies}</p>
             </div>
           </div>
         </GlassCard>
 
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white">
-              <FaCookie size={20} />
+        <GlassCard className="p-3 md:p-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white">
+              <FaCookie size={16} className="md:w-5 md:h-5" />
             </div>
             <div>
-              <p className="text-secondary text-sm">Docinhos</p>
-              <p className="text-2xl font-bold text-primary">{stats.candies}</p>
+              <p className="text-secondary text-xs md:text-sm">Docinhos</p>
+              <p className="text-xl md:text-2xl font-bold text-primary">{stats.candies}</p>
             </div>
           </div>
         </GlassCard>
 
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center text-white">
-              <FaBirthdayCake size={20} />
+        <GlassCard className="p-3 md:p-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-orange-500 flex items-center justify-center text-white">
+              <FaBirthdayCake size={16} className="md:w-5 md:h-5" />
             </div>
             <div>
-              <p className="text-secondary text-sm">Bolos</p>
-              <p className="text-2xl font-bold text-primary">{stats.cakes}</p>
+              <p className="text-secondary text-xs md:text-sm">Bolos</p>
+              <p className="text-xl md:text-2xl font-bold text-primary">{stats.cakes}</p>
             </div>
           </div>
         </GlassCard>
       </div>
 
       {/* Ações Rápidas - Docinhos */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-primary mb-4 flex items-center gap-2">
-          <FaCookie />
+      <div className="mb-6 md:mb-8">
+        <h2 className="text-xl md:text-2xl font-bold text-primary mb-3 md:mb-4 flex items-center gap-2">
+          <FaCookie className="w-4 h-4 md:w-5 md:h-5" />
           Docinhos
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <QuickActionCard
             icon={FaWeight}
             title="Massas"
@@ -173,11 +181,11 @@ export default function Dashboard() {
 
       {/* Ações Rápidas - Bolos */}
       <div>
-        <h2 className="text-2xl font-bold text-primary mb-4 flex items-center gap-2">
-          <FaBirthdayCake />
+        <h2 className="text-xl md:text-2xl font-bold text-primary mb-3 md:mb-4 flex items-center gap-2">
+          <FaBirthdayCake className="w-4 h-4 md:w-5 md:h-5" />
           Bolos
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <QuickActionCard
             icon={FaWeight}
             title="Massas"

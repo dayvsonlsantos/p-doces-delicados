@@ -11,6 +11,15 @@
   --bg-light: #f8fafc;
   --card-bg-light: rgba(255, 255, 255, 0.9);
   --card-border-light: rgba(0, 0, 0, 0.1);
+  
+  /* CORES DINÂMICAS PADRÃO (AZUL) */
+  --primary-hue: 210;
+  --primary-saturation: 80%;
+  --primary-lightness: 60%;
+  --primary-color-dynamic: hsl(210, 80%, 60%);
+  --primary-color-light: hsl(210, 80%, 75%);
+  --primary-color-dark: hsl(210, 80%, 45%);
+  --primary-gradient: linear-gradient(135deg, hsl(210, 80%, 60%) 0%, hsl(210, 80%, 75%) 100%);
 }
 
 * {
@@ -24,7 +33,6 @@ body {
   font-family: 'Inter', sans-serif;
   min-height: 100vh;
   transition: all 0.3s ease;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
 }
 
@@ -33,10 +41,24 @@ body * {
   color: inherit;
 }
 
-/* Modo Escuro */
+/* ========== MODO ESCURO COM CORES DINÂMICAS ========== */
 body.dark {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* FUNDO MAIS VIVO E CLARO - CORRIGIDO */
+  background: linear-gradient(135deg, 
+    hsl(var(--primary-hue, 210), calc(var(--primary-saturation, 80%) * 0.6), 15%) 0%,
+    hsl(calc(var(--primary-hue, 210) + 30), calc(var(--primary-saturation, 80%) * 0.5), 20%) 50%,
+    hsl(calc(var(--primary-hue, 210) + 60), calc(var(--primary-saturation, 80%) * 0.4), 25%) 100%
+  ) !important;
   color: white;
+}
+
+/* Preview mode - CORES AINDA MAIS VIVAS */
+body.dark.color-preview {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary-hue-preview, 210), calc(var(--primary-saturation-preview, 80%) * 0.6), 15%) 0%,
+    hsl(calc(var(--primary-hue-preview, 210) + 30), calc(var(--primary-saturation-preview, 80%) * 0.5), 20%) 50%,
+    hsl(calc(var(--primary-hue-preview, 210) + 60), calc(var(--primary-saturation-preview, 80%) * 0.4), 25%) 100%
+  ) !important;
 }
 
 .dark .glass {
@@ -59,35 +81,125 @@ body.dark {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* CORREÇÃO: Textos no modo escuro */
-.dark .text-primary {
+/* ========== BOTÕES COM CORES DINÂMICAS ========== */
+/* Botões principais - CORES DINÂMICAS FUNCIONANDO */
+body.dark .btn-primary,
+body.dark .glass-button:not(.btn-secondary):not(.btn-danger) {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary-hue, 210), var(--primary-saturation, 80%), var(--primary-lightness, 60%)) 0%,
+    hsl(var(--primary-hue, 210), var(--primary-saturation, 80%), calc(var(--primary-lightness, 60%) + 15%)) 100%
+  ) !important;
   color: white !important;
+  border: none !important;
+  border-radius: 1rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
-.dark .text-secondary {
-  color: rgba(255, 255, 255, 0.7) !important;
+/* Preview mode para botões */
+body.dark.color-preview .btn-primary,
+body.dark.color-preview .glass-button:not(.btn-secondary):not(.btn-danger) {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80%), var(--primary-lightness-preview, 60%)) 0%,
+    hsl(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80%), calc(var(--primary-lightness-preview, 60%) + 15%)) 100%
+  ) !important;
 }
 
-.dark .text-white {
-  color: white !important;
+/* Hover dos botões */
+body.dark .btn-primary:hover,
+body.dark .glass-button:not(.btn-secondary):not(.btn-danger):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
-.dark .text-white\/60 {
-  color: rgba(255, 255, 255, 0.6) !important;
+/* ========== SIDEBAR COM CORES DINÂMICAS ========== */
+/* Item selecionado na sidebar */
+body.dark .bg-blue-500\/20,
+body.dark .border-blue-500\/30 {
+  background: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.2) !important;
+  border-color: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.3) !important;
 }
 
-.dark .text-white\/70 {
-  color: rgba(255, 255, 255, 0.7) !important;
+body.dark .text-blue-400,
+body.dark .text-blue-600.dark\:text-blue-400 {
+  color: hsl(var(--primary-hue, 210), var(--primary-saturation, 80%), calc(var(--primary-lightness, 60%) + 15%)) !important;
 }
 
-.dark .text-white\/80 {
-  color: rgba(255, 255, 255, 0.8) !important;
+/* Preview mode para sidebar */
+body.dark.color-preview .bg-blue-500\/20,
+body.dark.color-preview .border-blue-500\/30 {
+  background: rgba(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80), var(--primary-lightness-preview, 60), 0.2) !important;
+  border-color: rgba(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80), var(--primary-lightness-preview, 60), 0.3) !important;
 }
 
-/* Modo Claro */
+body.dark.color-preview .text-blue-400 {
+  color: hsl(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80%), calc(var(--primary-lightness-preview, 60%) + 15%)) !important;
+}
+
+/* ========== CALCULADORA COM CORES DINÂMICAS ========== */
+/* Fundos da calculadora */
+body.dark .bg-blue-500\/10,
+body.dark .bg-blue-500\/20 {
+  background: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.1) !important;
+}
+
+body.dark .border-blue-500\/20,
+body.dark .border-blue-500\/30 {
+  border-color: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.2) !important;
+}
+
+/* Botões de ação na calculadora */
+body.dark .bg-blue-500\/30 {
+  background: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.3) !important;
+}
+
+body.dark .hover\:bg-blue-500\/40:hover {
+  background: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.4) !important;
+}
+
+/* Textos azuis substituídos */
+body.dark .text-blue-300,
+body.dark .text-blue-400 {
+  color: hsl(var(--primary-hue, 210), var(--primary-saturation, 80%), calc(var(--primary-lightness, 60%) + 15%)) !important;
+}
+
+/* Preview mode para calculadora */
+body.dark.color-preview .bg-blue-500\/10,
+body.dark.color-preview .bg-blue-500\/20 {
+  background: rgba(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80), var(--primary-lightness-preview, 60), 0.1) !important;
+}
+
+body.dark.color-preview .text-blue-300,
+body.dark.color-preview .text-blue-400 {
+  color: hsl(var(--primary-hue-preview, 210), var(--primary-saturation-preview, 80%), calc(var(--primary-lightness-preview, 60%) + 15%)) !important;
+}
+
+/* ========== CALCULADORA PNG - CORES DINÂMICAS ========== */
+.calculator-results {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary-hue, 210), calc(var(--primary-saturation, 80%) * 0.6), 15%) 0%,
+    hsl(calc(var(--primary-hue, 210) + 30), calc(var(--primary-saturation, 80%) * 0.5), 20%) 50%,
+    hsl(calc(var(--primary-hue, 210) + 60), calc(var(--primary-saturation, 80%) * 0.4), 25%) 100%
+  ) !important;
+}
+
+.calculator-results .bg-blue-600\/20 {
+  background: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.2) !important;
+}
+
+.calculator-results .border-blue-500\/30 {
+  border-color: rgba(var(--primary-hue, 210), var(--primary-saturation, 80), var(--primary-lightness, 60), 0.3) !important;
+}
+
+.calculator-results .text-blue-300 {
+  color: hsl(var(--primary-hue, 210), var(--primary-saturation, 80%), calc(var(--primary-lightness, 60%) + 15%)) !important;
+}
+
+/* ========== MODO CLARO ========== */
 body.light {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  color: #374151 !important; /* Cinza escuro em vez de preto */
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  color: #374151 !important;
 }
 
 .light .glass {
@@ -112,143 +224,28 @@ body.light {
 /* CORREÇÃO: Textos no modo claro - TONS DE CINZA */
 .light,
 .light * {
-  color: #374151 !important; /* Cinza escuro principal */
+  color: #374151 !important;
 }
 
 .light .text-primary {
-  color: #374151 !important; /* Cinza escuro */
+  color: #374151 !important;
 }
 
 .light .text-secondary {
-  color: #6b7280 !important; /* Cinza médio */
+  color: #6b7280 !important;
 }
 
 .light .text-white {
-  color: #374151 !important; /* Substitui branco por cinza escuro */
+  color: #374151 !important;
 }
 
-.light .text-white\/60 {
-  color: #9ca3af !important; /* Cinza mais claro */
+/* Botões no modo claro (mantém azul) */
+.light .btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+  color: white !important;
 }
 
-.light .text-white\/70 {
-  color: #6b7280 !important; /* Cinza médio */
-}
-
-.light .text-white\/80 {
-  color: #4b5563 !important; /* Cinza escuro */
-}
-
-/* CORREÇÃO: Cores de fundo no modo claro */
-.light .bg-white\/5 {
-  background: rgba(0, 0, 0, 0.03) !important;
-}
-
-.light .bg-white\/10 {
-  background: rgba(0, 0, 0, 0.05) !important;
-}
-
-.light .bg-white\/20 {
-  background: rgba(0, 0, 0, 0.1) !important;
-}
-
-.light .bg-white\/30 {
-  background: rgba(0, 0, 0, 0.15) !important;
-}
-
-.light .border-white\/10 {
-  border-color: rgba(0, 0, 0, 0.1) !important;
-}
-
-.light .border-white\/20 {
-  border-color: rgba(0, 0, 0, 0.2) !important;
-}
-
-.light .border-white\/30 {
-  border-color: rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Inputs e Selects */
-.glass-input {
-  backdrop-filter: blur(10px);
-  border: 1px solid;
-  border-radius: 1rem;
-  padding: 0.75rem 1rem;
-  width: 100%;
-  transition: all 0.3s ease;
-}
-
-.dark .glass-input {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.dark .glass-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.dark .glass-input:focus {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
-}
-
-.light .glass-input {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: #374151;
-}
-
-.light .glass-input::placeholder {
-  color: #9ca3af !important; /* Cinza para placeholder */
-}
-
-.light .glass-input:focus {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: #3b82f6;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-/* Selects específicos */
-.dark select.glass-input {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.dark select.glass-input option {
-  background: #374151;
-  color: white;
-}
-
-.light select.glass-input {
-  background: rgba(255, 255, 255, 0.7);
-  color: #374151;
-}
-
-.light select.glass-input option {
-  background: white;
-  color: #374151;
-}
-
-/* Botões */
-.btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  color: white !important; /* Forçar branco nos botões */
-  border: none;
-  border-radius: 1rem;
-  padding: 0.75rem 1.5rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
+/* ========== COMPONENTES GERAIS ========== */
 .btn-secondary {
   background: rgba(255, 255, 255, 0.2);
   color: inherit;
@@ -271,129 +268,41 @@ body.light {
   border-color: rgba(0, 0, 0, 0.1);
 }
 
-/* Glass Select */
-.glass-select {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+/* Inputs e Selects */
+.glass-input {
+  backdrop-filter: blur(10px);
+  border: 1px solid;
   border-radius: 1rem;
-  color: white;
+  padding: 0.75rem 1rem;
+  width: 100%;
   transition: all 0.3s ease;
 }
 
-.glass-select:focus {
-  outline: none;
-  ring: 2px;
-  ring-color: #3b82f6;
-  border-color: transparent;
+.dark .glass-input {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
 }
 
-.light .glass-select {
-  background: rgba(255, 255, 255, 0.7) !important;
-  border: 1px solid rgba(0, 0, 0, 0.2) !important;
-  color: #374151 !important;
+.dark .glass-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.light .glass-select option {
-  background: white !important;
-  color: #374151 !important;
+.light .glass-input {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #374151;
 }
 
-/* Cores específicas do modo claro */
-.light .bg-blue-500\/10 {
-  background: rgba(59, 130, 246, 0.1) !important;
-}
-
-.light .bg-green-500\/10 {
-  background: rgba(34, 197, 94, 0.1) !important;
-}
-
-.light .bg-purple-500\/10 {
-  background: rgba(168, 85, 247, 0.1) !important;
-}
-
-.light .bg-orange-500\/10 {
-  background: rgba(249, 115, 22, 0.1) !important;
-}
-
-.light .bg-red-500\/10 {
-  background: rgba(239, 68, 68, 0.1) !important;
-}
-
-.light .bg-pink-500\/10 {
-  background: rgba(236, 72, 153, 0.1) !important;
-}
-
-.light .bg-indigo-500\/10 {
-  background: rgba(99, 102, 241, 0.1) !important;
-}
-
-/* CORREÇÃO: Cores de texto específicas para modo claro */
-.light .text-blue-400 {
-  color: #1d4ed8 !important;
-}
-
-.light .text-green-400 {
-  color: #16a34a !important;
-}
-
-.light .text-purple-400 {
-  color: #9333ea !important;
-}
-
-.light .text-orange-400 {
-  color: #ea580c !important;
-}
-
-.light .text-red-400 {
-  color: #dc2626 !important;
-}
-
-.light .text-pink-400 {
-  color: #db2777 !important;
-}
-
-.light .text-indigo-400 {
-  color: #4f46e5 !important;
-}
-
-.light .text-primary-300 {
-  color: #6b7280 !important;
-}
-
-/* Cores mais claras */
-.light .text-blue-300 {
-  color: #60a5fa !important;
-}
-
-.light .text-green-300 {
-  color: #4ade80 !important;
-}
-
-.light .text-purple-300 {
-  color: #c084fc !important;
-}
-
-.light .text-orange-300 {
-  color: #fdba74 !important;
-}
-
-.light .text-red-300 {
-  color: #fca5a5 !important;
-}
-
-.light .text-pink-300 {
-  color: #f9a8d4 !important;
-}
-
-/* CORREÇÃO: Cores específicas que devem permanecer */
-.light .text-green-500,
-.light .text-blue-500,
-.light .text-red-500,
-.light .text-yellow-500,
-.light .text-purple-500 {
-  color: inherit !important; /* Manter cores específicas dos ícones */
+/* Cores específicas que devem permanecer (feedback) */
+.dark .text-green-400,
+.dark .text-red-400,
+.dark .text-yellow-400,
+.dark .text-purple-400,
+.dark .text-pink-400,
+.dark .text-orange-400 {
+  /* Mantém cores específicas para feedback */
+  color: inherit !important;
 }
 
 /* Scrollbar */
@@ -411,10 +320,6 @@ body.light {
   border-radius: 3px;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
 .light ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
   border-radius: 3px;
@@ -425,33 +330,145 @@ body.light {
   border-radius: 3px;
 }
 
-.light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
+/* Estilos para selects - Glass Design */
+.glass-select {
+  @apply w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 
+         text-white placeholder-white/50 focus:outline-none focus:ring-2 
+         focus:ring-primary-400 focus:border-transparent transition-all duration-300;
 }
 
-/* CORREÇÃO: Garantir que cores específicas funcionem */
-body:not(.dark):not(.light) .glass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+.glass-select option {
+  @apply bg-gray-800 text-white;
 }
 
-body:not(.dark):not(.light) .glass-dark {
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.glass-select:disabled {
+  @apply opacity-50 cursor-not-allowed;
 }
 
-body:not(.dark):not(.light) .glass-input {
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 1rem;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+/* Para garantir que os selects tenham o mesmo estilo dos inputs */
+select.glass-input {
+  @apply bg-white/10 border border-white/20 text-white rounded-2xl px-4 py-3 
+         focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent 
+         transition-all duration-300;
 }
 
-body:not(.dark):not(.light) .glass-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+select.glass-input option {
+  @apply bg-gray-800 text-white;
+}
+
+/* styles/globals.css */
+/* ... seu código atual ... */
+
+/* ========== RESPONSIVIDADE MOBILE ========== */
+@media (max-width: 768px) {
+  /* Ajustes gerais de layout */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Header mobile */
+  .header-mobile {
+    padding: 0.75rem 1rem;
+  }
+
+  .header-mobile h1 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Sidebar mobile */
+  .sidebar-mobile {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* Cards em mobile */
+  .glass-card {
+    padding: 1rem !important;
+    margin: 0.5rem 0;
+  }
+
+  /* Grid responsivo */
+  .grid-responsive {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  /* Botões mobile */
+  .btn-mobile {
+    padding: 0.75rem 1rem !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Inputs mobile */
+  .glass-input {
+    padding: 0.875rem 1rem !important;
+    font-size: 16px !important; /* Prevenir zoom no iOS */
+  }
+
+  /* Textos mobile */
+  .text-mobile-lg {
+    font-size: 1.5rem !important;
+  }
+
+  .text-mobile-base {
+    font-size: 0.875rem !important;
+  }
+
+  .text-mobile-sm {
+    font-size: 0.75rem !important;
+  }
+
+  /* Espaçamentos mobile */
+  .space-mobile-y > * + * {
+    margin-top: 0.75rem !important;
+  }
+
+  /* Modal mobile */
+  .modal-mobile {
+    margin: 1rem !important;
+    max-height: calc(100vh - 2rem) !important;
+  }
+
+  /* Hide elements on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Show elements only on mobile */
+  .show-mobile {
+    display: block !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Ajustes para telas muito pequenas */
+  .header-mobile h1 {
+    font-size: 1.125rem !important;
+  }
+
+  .glass-card {
+    padding: 0.75rem !important;
+    border-radius: 1rem !important;
+  }
+
+  .btn-mobile {
+    padding: 0.625rem 0.875rem !important;
+  }
+}
+
+/* Prevenir zoom em inputs no iOS */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe area para iPhone com notch */
+@supports(padding: max(0px)) {
+  .safe-area {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }

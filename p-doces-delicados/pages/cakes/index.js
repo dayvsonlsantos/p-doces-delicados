@@ -4,6 +4,7 @@ import GlassButton from '../../components/UI/GlassButton'
 import CakeModal from '../../components/Cakes/CakeModal'
 import CakeList from '../../components/Cakes/CakeList'
 import { useState, useEffect } from 'react'
+import { FaPlus, FaBirthdayCake, FaExclamationTriangle, FaWeight, FaIceCream, FaSpinner } from 'react-icons/fa'
 
 export default function Cakes() {
   const [cakes, setCakes] = useState([])
@@ -109,34 +110,41 @@ export default function Cakes() {
   return (
     <Layout activePage="cakes">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-white mb-2">Bolos</h1>
-          <p className="text-white/60">Cadastre os tipos de bolos e visualize seus custos</p>
+      <div className="flex items-center justify-between mb-4 md:mb-6 flex-col xs:flex-row gap-3 xs:gap-0">
+        <div className="text-center xs:text-left w-full xs:w-auto">
+          <h1 className="text-xl xs:text-2xl md:text-4xl font-bold text-white mb-1 xs:mb-2">Bolos</h1>
+          <p className="text-white/60 text-xs xs:text-sm md:text-base">Cadastre os tipos de bolos e visualize seus custos</p>
         </div>
         <GlassButton
           onClick={() => setIsModalOpen(true)}
           disabled={!canCreateCake}
+          className="w-full xs:w-auto text-xs xs:text-sm px-3 xs:px-4 py-2 xs:py-3"
         >
-          <i className="fas fa-plus"></i>
-          Novo Bolo
+          <FaPlus className="w-3 h-3 xs:w-4 xs:h-4" />
+          <span>Novo Bolo</span>
         </GlassButton>
       </div>
 
       {!canCreateCake && (
-        <div className="glass rounded-3xl p-6 text-center mb-6 border border-orange-500/30">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-300 mx-auto mb-4">
-            <i className="fas fa-exclamation-triangle text-xl"></i>
+        <div className="glass rounded-xl md:rounded-2xl p-3 md:p-4 text-center mb-4 md:mb-6 border border-orange-500/30">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-300 mx-auto mb-2 md:mb-3">
+            <FaExclamationTriangle className="w-4 h-4 md:w-5 md:h-5" />
           </div>
-          <h3 className="text-white font-semibold mb-2">Cadastre massas e coberturas primeiro</h3>
-          <p className="text-white/60 mb-4">Você precisa cadastrar massas e coberturas antes de criar bolos</p>
-          <div className="flex gap-3 justify-center">
-            <GlassButton onClick={() => window.location.href = '/cakes/masses'}>
-              <i className="fas fa-weight-scale"></i>
+          <h3 className="text-white font-semibold text-sm md:text-base mb-1 md:mb-2">Cadastre massas e coberturas primeiro</h3>
+          <p className="text-white/60 text-xs md:text-sm mb-3 md:mb-4">Você precisa cadastrar massas e coberturas antes de criar bolos</p>
+          <div className="flex flex-col xs:flex-row gap-2 md:gap-3 justify-center">
+            <GlassButton 
+              onClick={() => window.location.href = '/cakes/masses'} 
+              className="text-xs px-3 py-2"
+            >
+              <FaWeight className="w-3 h-3" />
               Cadastrar Massas
             </GlassButton>
-            <GlassButton onClick={() => window.location.href = '/cakes/frostings'}>
-              <i className="fas fa-ice-cream"></i>
+            <GlassButton 
+              onClick={() => window.location.href = '/cakes/frostings'} 
+              className="text-xs px-3 py-2"
+            >
+              <FaIceCream className="w-3 h-3" />
               Cadastrar Coberturas
             </GlassButton>
           </div>
@@ -144,13 +152,13 @@ export default function Cakes() {
       )}
 
       {/* Content */}
-      <GlassCard>
+      <GlassCard className="p-3 md:p-4">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white mx-auto mb-4">
-              <i className="fas fa-spinner fa-spin text-xl"></i>
+          <div className="text-center py-6 md:py-8">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white/10 flex items-center justify-center text-white mx-auto mb-3 md:mb-4">
+              <FaSpinner className="animate-spin w-5 h-5 md:w-6 md:h-6" />
             </div>
-            <p className="text-white/60">Carregando bolos...</p>
+            <p className="text-white/60 text-sm md:text-base">Carregando bolos...</p>
           </div>
         ) : (
           <CakeList

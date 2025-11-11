@@ -2,12 +2,14 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useTheme } from '../../contexts/ThemeContext'
-import { 
-  FaHome, FaBox, FaWeight, FaCookie, FaTag, 
+import {
+  FaHome, FaBox, FaWeight, FaCookie, FaTag,
   FaBirthdayCake, FaChevronDown, FaChevronRight,
-  FaIceCream, FaCalculator
+  FaIceCream, FaCalculator,
+  FaClipboardList
 } from 'react-icons/fa'
 import { useState } from 'react'
+import Image from 'next/image'
 
 export default function Sidebar({ activePage, onClose }) {
   const router = useRouter()
@@ -30,6 +32,13 @@ export default function Sidebar({ activePage, onClose }) {
       name: 'Dashboard',
       path: '/',
       icon: FaHome,
+      type: 'single'
+    },
+    {
+      id: 'orders',
+      name: 'Encomendas',
+      path: '/orders',
+      icon: FaClipboardList,
       type: 'single'
     },
     {
@@ -84,95 +93,106 @@ export default function Sidebar({ activePage, onClose }) {
 
   return (
     <div className="h-full glass-dark w-80 flex flex-col">
-      <div className="p-6 border-b border-white/10 dark:border-gray-200/10">
+      {/* Header fixo */}
+      <div className="flex-shrink-0 p-4 md:p-6 border-b border-white/10 dark:border-gray-200/10">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white">
-            <FaBirthdayCake size={20} />
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-white">
+            <Image 
+              width={100} 
+              height={100} 
+              className='rounded-xl md:rounded-2xl' 
+              src={'/logo/logo.png'}
+              alt="Doces Delicados"
+            />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-primary">Doces Delicados</h1>
-            <p className="text-secondary text-sm"></p>
+            <h1 className="text-lg md:text-xl font-bold text-primary">Doces Delicados</h1>
+            <p className="text-secondary text-xs md:text-sm"></p>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        {menuSections.map((section) => {
-          if (section.type === 'single') {
-            const IconComponent = section.icon
-            const isActive = router.pathname === section.path
-            
-            return (
-              <Link
-                key={section.id}
-                href={section.path}
-                onClick={onClose}
-                className={`flex items-center gap-3 p-4 rounded-2xl transition-all ${
-                  isActive 
-                    ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30' 
-                    : 'text-secondary hover:bg-white/10 dark:hover:bg-gray-800/50 hover:text-primary'
-                }`}
-              >
-                <IconComponent size={18} />
-                <span className="font-medium">{section.name}</span>
-              </Link>
-            )
-          } else {
-            const IconComponent = section.icon
-            const isExpanded = expandedSections[section.id]
-            const hasActiveChild = section.items.some(item => 
-              router.pathname === item.path || router.pathname.startsWith(item.path + '/')
-            )
+      {/* Conteúdo com scroll */}
+      <div className="flex-1 overflow-y-auto">
+        <nav className="p-3 md:p-4 space-y-1">
+          {menuSections.map((section) => {
+            if (section.type === 'single') {
+              const IconComponent = section.icon
+              const isActive = router.pathname === section.path
 
-            return (
-              <div key={section.id}>
-                <button
-                  onClick={() => toggleSection(section.id)}
-                  className={`flex items-center justify-between w-full p-4 rounded-2xl transition-all ${
-                    hasActiveChild
-                      ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30' 
+              return (
+                <Link
+                  key={section.id}
+                  href={section.path}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl transition-all ${isActive
+                      ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
                       : 'text-secondary hover:bg-white/10 dark:hover:bg-gray-800/50 hover:text-primary'
-                  }`}
+                    }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <IconComponent size={18} />
-                    <span className="font-medium">{section.name}</span>
-                  </div>
-                  {isExpanded ? <FaChevronDown size={14} /> : <FaChevronRight size={14} />}
-                </button>
+                  <IconComponent size={16} className="flex-shrink-0" />
+                  <span className="font-medium text-sm md:text-base">{section.name}</span>
+                </Link>
+              )
+            } else {
+              const IconComponent = section.icon
+              const isExpanded = expandedSections[section.id]
+              const hasActiveChild = section.items.some(item =>
+                router.pathname === item.path || router.pathname.startsWith(item.path + '/')
+              )
 
-                {isExpanded && (
-                  <div className="ml-8 mt-1 space-y-1">
-                    {section.items.map((item) => {
-                      const ItemIcon = getItemIcon(item.icon.name)
-                      const isActive = router.pathname === item.path
-                      
-                      return (
-                        <Link
-                          key={item.path}
-                          href={item.path}
-                          onClick={onClose}
-                          className={`flex items-center gap-3 p-3 rounded-xl transition-all text-sm ${
-                            isActive 
-                              ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' 
-                              : 'text-secondary hover:bg-white/10 dark:hover:bg-gray-800/50 hover:text-primary'
-                          }`}
-                        >
-                          <ItemIcon size={14} />
-                          <span>{item.name}</span>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          }
-        })}
-      </nav>
+              return (
+                <div key={section.id}>
+                  <button
+                    onClick={() => toggleSection(section.id)}
+                    className={`flex items-center justify-between w-full p-3 md:p-4 rounded-xl md:rounded-2xl transition-all ${hasActiveChild
+                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                        : 'text-secondary hover:bg-white/10 dark:hover:bg-gray-800/50 hover:text-primary'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <IconComponent size={16} className="flex-shrink-0" />
+                      <span className="font-medium text-sm md:text-base">{section.name}</span>
+                    </div>
+                    {isExpanded ? 
+                      <FaChevronDown size={12} className="flex-shrink-0" /> : 
+                      <FaChevronRight size={12} className="flex-shrink-0" />
+                    }
+                  </button>
 
-      <div className="p-4 border-t border-white/10 dark:border-gray-200/10">
-        <div className="text-center text-secondary text-sm">
+                  {isExpanded && (
+                    <div className="ml-6 md:ml-8 mt-1 space-y-1">
+                      {section.items.map((item) => {
+                        const ItemIcon = getItemIcon(item.icon.name)
+                        const isActive = router.pathname === item.path
+
+                        return (
+                          <Link
+                            key={item.path}
+                            href={item.path}
+                            onClick={onClose}
+                            className={`flex items-center gap-3 p-2 md:p-3 rounded-lg md:rounded-xl transition-all text-xs md:text-sm ${isActive
+                                ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                                : 'text-secondary hover:bg-white/10 dark:hover:bg-gray-800/50 hover:text-primary'
+                              }`}
+                          >
+                            <ItemIcon size={12} className="flex-shrink-0" />
+                            <span className="truncate">{item.name}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+          })}
+        </nav>
+      </div>
+
+      {/* Footer fixo */}
+      <div className="flex-shrink-0 p-3 md:p-4 border-t border-white/10 dark:border-gray-200/10">
+        <div className="text-center text-secondary text-xs md:text-sm">
           <p>Tema: {theme === 'dark' ? 'Escuro' : 'Claro'}</p>
           <p>v2.0.0</p>
         </div>

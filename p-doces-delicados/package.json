@@ -10,11 +10,13 @@
     "create-admin": "node scripts/createAdminUser.js"
   },
   "dependencies": {
+    "critters": "^0.0.23",
+    "html2canvas": "^1.4.1",
+    "mongodb": "^5.8.1",
     "next": "13.5.6",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-icons": "^4.12.0",
-    "mongodb": "^5.8.1"
+    "react-icons": "^4.12.0"
   },
   "devDependencies": {
     "autoprefixer": "10.4.16",

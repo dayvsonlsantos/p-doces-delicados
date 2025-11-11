@@ -38,7 +38,7 @@ export default function CakeBatch() {
   return (
     <Layout activePage="cakes-batch">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2">Calculadora de Lote - Bolos</h1>
+        <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">Calculadora de Lote - Bolos</h1>
         <p className="text-white/60">Calcule os ingredientes necessários para produção de bolos em lote</p>
       </div>
 

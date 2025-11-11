@@ -1,4 +1,3 @@
-// pages/supplies/index.js
 import Layout from '../../components/Layout/Layout'
 import GlassCard from '../../components/UI/GlassCard'
 import GlassButton from '../../components/UI/GlassButton'
@@ -78,24 +77,24 @@ export default function Supplies() {
 
   return (
     <Layout activePage="supplies">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-primary mb-2">Insumos</h1>
-          <p className="text-secondary">Cadastre papéis, embalagens e outros itens por unidade</p>
+      <div className="flex items-center justify-between mb-6 md:mb-8 flex-col sm:flex-row gap-4 sm:gap-0">
+        <div className="text-center sm:text-left">
+          <h1 className="text-2xl md:text-4xl font-bold text-primary mb-2">Insumos</h1>
+          <p className="text-secondary text-sm md:text-base">Cadastre papéis, embalagens e outros itens por unidade</p>
         </div>
-        <GlassButton onClick={handleNewSupply}>
-          <FaPlus />
-          Novo Insumo
+        <GlassButton onClick={handleNewSupply} className="w-full sm:w-auto">
+          <FaPlus className="w-4 h-4" />
+          <span className="text-sm md:text-base">Novo Insumo</span>
         </GlassButton>
       </div>
 
-      <GlassCard>
+      <GlassCard className="p-4 md:p-6">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-500 mx-auto mb-4">
-              <FaTag className="animate-spin" />
+          <div className="text-center py-8 md:py-12">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-500 mx-auto mb-4">
+              <FaTag className="animate-spin w-6 h-6 md:w-8 md:h-8" />
             </div>
-            <p className="text-secondary">Carregando insumos...</p>
+            <p className="text-secondary text-sm md:text-base">Carregando insumos...</p>
           </div>
         ) : (
           <SupplyList

@@ -1,4 +1,4 @@
-// pages/products/index.js
+// pages/products/index.js (atualizado)
 import Layout from '../../components/Layout/Layout'
 import GlassCard from '../../components/UI/GlassCard'
 import GlassButton from '../../components/UI/GlassButton'
@@ -76,24 +76,24 @@ export default function Products() {
 
   return (
     <Layout activePage="products">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-primary mb-2">Produtos</h1>
-          <p className="text-secondary">Cadastre as matérias-primas usadas nas receitas</p>
+      <div className="flex items-center justify-between mb-6 md:mb-8 flex-col sm:flex-row gap-4 sm:gap-0">
+        <div className="text-center sm:text-left">
+          <h1 className="text-2xl md:text-4xl font-bold text-primary mb-2">Produtos</h1>
+          <p className="text-secondary text-sm md:text-base">Cadastre as matérias-primas usadas nas receitas</p>
         </div>
-        <GlassButton onClick={handleNewProduct}>
-          <FaPlus />
-          Novo Produto
+        <GlassButton onClick={handleNewProduct} className="w-full sm:w-auto">
+          <FaPlus className="w-4 h-4" />
+          <span className="text-sm md:text-base">Novo Produto</span>
         </GlassButton>
       </div>
 
-      <GlassCard>
+      <GlassCard className="p-4 md:p-6">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500 mx-auto mb-4">
-              <FaBox className="animate-spin" />
+          <div className="text-center py-8 md:py-12">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500 mx-auto mb-4">
+              <FaBox className="animate-spin w-6 h-6 md:w-8 md:h-8" />
             </div>
-            <p className="text-secondary">Carregando produtos...</p>
+            <p className="text-secondary text-sm md:text-base">Carregando produtos...</p>
           </div>
         ) : (
           <ProductList

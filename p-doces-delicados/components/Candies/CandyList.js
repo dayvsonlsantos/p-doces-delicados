@@ -1,12 +1,10 @@
-// components/Candies/CandyList.js
-import { FaEdit, FaTrash } from 'react-icons/fa'
+import { FaEdit, FaTrash, FaCookie } from 'react-icons/fa'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
 
 export default function CandyList({ candies, masses, products, onEdit, onDelete }) {
   const [supplies, setSupplies] = useState([])
 
-  // Carregar insumos
   useEffect(() => {
     loadSupplies()
   }, [])
@@ -21,7 +19,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     }
   }
 
-  // Função para calcular custo da massa
   const calculateMassCost = (ingredients, products) => {
     let totalCost = 0
 
@@ -44,9 +41,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     return totalCost
   }
 
-  // Função para calcular custo do docinho com múltiplas massas
   const calculateCandyCost = (candy) => {
-    // Verificar se é o formato antigo (uma massa) ou novo (múltiplas massas)
     const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
     
     if (!candyMasses || candyMasses.length === 0 || !candyMasses.some(mass => mass.massName && mass.grams)) {
@@ -64,7 +59,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
       massDetails: []
     }
 
-    // 1. CUSTO DAS MASSAS (agora múltiplas)
     candyMasses.forEach(massItem => {
       if (massItem.massName && massItem.grams) {
         const mass = masses.find(m => m.name === massItem.massName)
@@ -87,7 +81,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     costBreakdown.massCost = totalMassCost
     costBreakdown.totalGrams = totalGrams
 
-    // 2. CUSTO DOS EXTRAS
     let extrasCost = 0
     if (candy.extras && candy.extras.length > 0) {
       candy.extras.forEach(extra => {
@@ -108,7 +101,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     }
     costBreakdown.extrasCost = extrasCost
 
-    // 3. CUSTO DOS INSUMOS
     let suppliesCost = 0
     if (candy.supplies && candy.supplies.length > 0) {
       candy.supplies.forEach(supplyId => {
@@ -138,25 +130,24 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     return supply ? supply.name : 'Insumo não encontrado'
   }
 
-  // Função para calcular sugestão de preço (3x o custo)
   const calculateSuggestedPrice = (cost) => {
-    return cost * 3 // 200% de margem (3x o custo)
+    return cost * 3
   }
 
   if (candies.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center text-white/30 mx-auto mb-4">
-          <i className="fas fa-cookie text-3xl"></i>
+      <div className="text-center py-8 md:py-12">
+        <div className="w-16 h-16 md:w-24 md:h-24 rounded-2xl bg-white/10 flex items-center justify-center text-white/30 mx-auto mb-4">
+          <FaCookie className="w-6 h-6 md:w-8 md:h-8" />
         </div>
-        <h3 className="text-white text-lg font-semibold mb-2">Nenhum docinho cadastrado</h3>
-        <p className="text-white/60">Comece criando seus primeiros tipos de docinhos</p>
+        <h3 className="text-white text-base md:text-lg font-semibold mb-2">Nenhum docinho cadastrado</h3>
+        <p className="text-white/60 text-sm md:text-base">Comece criando seus primeiros tipos de docinhos</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {candies.map((candy) => {
         const costBreakdown = calculateCandyCost(candy)
         const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
@@ -164,26 +155,28 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
         const hasSalePrice = candy.salePrice && parseFloat(candy.salePrice) > 0
 
         return (
-          <div key={candy._id} className="p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-center text-white">
-                  <i className="fas fa-cookie"></i>
+          <div key={candy._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
+            <div className="flex items-start justify-between mb-4 flex-col md:flex-row gap-4">
+              <div className="flex items-start gap-3 md:gap-4 flex-1 w-full">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
+                  <FaCookie className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-white text-lg mb-2">{candy.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between flex-col md:flex-row gap-3 md:gap-0">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-white text-base md:text-lg mb-2 truncate">
+                        {candy.name}
+                      </h3>
                       
                       {/* Informações das Massas */}
                       <div className="mb-3">
-                        <p className="text-white/60 text-sm mb-1">
+                        <p className="text-white/60 text-xs md:text-sm mb-1">
                           {candyMasses.length > 1 ? `${candyMasses.length} massas` : '1 massa'} • {costBreakdown.totalGrams.toFixed(2)}g total
                         </p>
                         
                         {/* Detalhes das massas */}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1 md:gap-2">
                           {candyMasses.map((massItem, index) => (
                             <span key={index} className="px-2 py-1 bg-white/10 rounded-full text-xs text-white/80">
                               {getMassName(massItem.massName)} ({massItem.grams}g)
@@ -193,7 +186,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                       </div>
 
                       {/* Custo Detalhado */}
-                      <div className="space-y-1 text-sm">
+                      <div className="space-y-1 text-xs md:text-sm">
                         <div className="flex justify-between">
                           <span className="text-white/70">Custo massa(s):</span>
                           <span className="text-white">R$ {costBreakdown.massCost.toFixed(4)}</span>
@@ -222,8 +215,8 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                       </div>
                     </div>
                     
-                    {/* Card de Preço - SEMPRE EXIBIDO */}
-                    <div className="text-right ml-4">
+                    {/* Card de Preço */}
+                    <div className="text-right w-full md:w-auto">
                       <div className={`border rounded-xl p-3 min-w-[140px] ${
                         hasSalePrice 
                           ? 'bg-green-500/10 border-green-500/20' 
@@ -231,12 +224,11 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                       }`}>
                         
                         {hasSalePrice ? (
-                          // Preço definido pelo usuário
                           <>
-                            <div className="text-green-400 font-bold text-lg">
+                            <div className="text-green-400 font-bold text-base md:text-lg">
                               R$ {parseFloat(candy.salePrice).toFixed(2)}
                             </div>
-                            <div className="text-green-300 text-sm">
+                            <div className="text-green-300 text-xs md:text-sm">
                               Venda
                             </div>
                             <div className="text-green-200 text-xs mt-1">
@@ -247,12 +239,11 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                             </div>
                           </>
                         ) : (
-                          // Sugestão de preço
                           <>
-                            <div className="text-blue-400 font-bold text-lg">
+                            <div className="text-blue-400 font-bold text-base md:text-lg">
                               R$ {suggestedPrice.toFixed(2)}
                             </div>
-                            <div className="text-blue-300 text-sm">
+                            <div className="text-blue-300 text-xs md:text-sm">
                               Sugestão
                             </div>
                             <div className="text-blue-200 text-xs mt-1">
@@ -282,35 +273,35 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                 <GlassButton
                   variant="secondary"
                   onClick={() => onEdit(candy)}
-                  className="px-4 py-2"
+                  className="px-3 py-2 text-xs md:text-sm"
                 >
-                  <FaEdit size={14} />
+                  <FaEdit className="w-3 h-3 md:w-3 md:h-3" />
                 </GlassButton>
                 <GlassButton
                   variant="danger"
                   onClick={() => onDelete(candy._id)}
-                  className="px-4 py-2"
+                  className="px-3 py-2 text-xs md:text-sm"
                 >
-                  <FaTrash size={14} />
+                  <FaTrash className="w-3 h-3 md:w-3 md:h-3" />
                 </GlassButton>
               </div>
             </div>
 
             {/* Extras */}
             {candy.extras && candy.extras.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-3 md:mt-4">
                 <h4 className="text-white/80 text-sm font-medium mb-2">Extras:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {candy.extras.map((extra, index) => (
                     <div key={index} className="flex justify-between items-center p-2 rounded-xl bg-white/5">
-                      <span className="text-white text-sm">
+                      <span className="text-white text-xs md:text-sm truncate">
                         {getProductName(extra.productId)}
                       </span>
-                      <span className="text-primary-300 text-sm font-semibold">
+                      <span className="text-primary-300 text-xs md:text-sm font-semibold">
                         {extra.grams}g
                       </span>
                     </div>
@@ -321,15 +312,15 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
 
             {/* Insumos */}
             {candy.supplies && candy.supplies.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-3 md:mt-4">
                 <h4 className="text-white/80 text-sm font-medium mb-2">Insumos:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {candy.supplies.map((supplyId, index) => (
                     <div key={index} className="flex justify-between items-center p-2 rounded-xl bg-white/5">
-                      <span className="text-white text-sm">
+                      <span className="text-white text-xs md:text-sm truncate">
                         {getSupplyName(supplyId)}
                       </span>
-                      <span className="text-blue-400 text-sm font-semibold">
+                      <span className="text-blue-400 text-xs md:text-sm font-semibold">
                         1 un
                       </span>
                     </div>
@@ -340,20 +331,20 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
 
             {/* Detalhes das Massas Individualmente */}
             {costBreakdown.massDetails.length > 1 && (
-              <div className="mt-4">
+              <div className="mt-3 md:mt-4">
                 <h4 className="text-white/80 text-sm font-medium mb-2">Detalhes por Massa:</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
                   {costBreakdown.massDetails.map((massDetail, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                      <div>
-                        <span className="text-white text-sm font-medium">
+                    <div key={index} className="flex justify-between items-center p-2 md:p-3 rounded-xl bg-white/5">
+                      <div className="min-w-0">
+                        <span className="text-white text-xs md:text-sm font-medium truncate">
                           {massDetail.massName}
                         </span>
                         <div className="text-white/60 text-xs">
                           {massDetail.grams.toFixed(2)}g
                         </div>
                       </div>
-                      <span className="text-primary-300 text-sm font-semibold">
+                      <span className="text-primary-300 text-xs md:text-sm font-semibold">
                         R$ {massDetail.cost.toFixed(4)}
                       </span>
                     </div>

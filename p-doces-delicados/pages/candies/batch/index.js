@@ -1,9 +1,10 @@
-// pages/batch.js - completo com arredondamento
+// pages/batch.js - completo com arredondamento e salvar PNG
 import Layout from '../../../components/Layout/Layout'
 import GlassCard from '../../../components/UI/GlassCard'
 import GlassButton from '../../../components/UI/GlassButton'
-import { useState, useEffect } from 'react'
-import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { useState, useEffect, useRef } from 'react'
+import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp, FaDownload } from 'react-icons/fa'
+import html2canvas from 'html2canvas'
 
 // Função de arredondamento para gramas
 const roundGrams = (grams) => {
@@ -23,6 +24,8 @@ export default function BatchCalculator() {
     masses: false,
     summary: false
   })
+
+  const resultsRef = useRef(null)
 
   useEffect(() => {
     loadData()
@@ -155,28 +158,184 @@ export default function BatchCalculator() {
     })
   }
 
-  const printResults = () => {
-    window.print()
+  const saveAsPNG = async () => {
+    if (!resultsRef.current) return
+
+    try {
+      // Salvar estado atual das seções
+      const originalExpandedState = { ...expandedSections }
+      
+      // Expandir todas as seções temporariamente
+      setExpandedSections({
+        candies: true,
+        masses: true,
+        summary: true
+      })
+
+      // Aguardar o React atualizar a UI
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      const canvas = await html2canvas(resultsRef.current, {
+        backgroundColor: '#1a1b26',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      })
+
+      const link = document.createElement('a')
+      link.download = `calculo-docinhos-${new Date().toISOString().split('T')[0]}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+
+      // Restaurar estado original das seções
+      setExpandedSections(originalExpandedState)
+
+    } catch (error) {
+      console.error('Erro ao salvar PNG:', error)
+      alert('Erro ao salvar imagem. Tente novamente.')
+    }
   }
+
+  // Componente para renderizar os resultados expandidos (sempre aberto no PNG)
+  const ResultsForPNG = () => (
+    <div className="space-y-4 bg-gray-900 p-4 rounded-xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-white">Resultados do Lote de Docinhos</h3>
+        <div className="text-blue-400 text-sm">
+          Gerado em: {new Date().toLocaleDateString('pt-BR')}
+        </div>
+      </div>
+
+      {/* Resumo Financeiro */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-blue-500/10 rounded-xl">
+        <div className="text-center">
+          <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
+          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
+          <p className="text-blue-400 text-lg font-bold">R$ {calculations.totalRevenue}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
+          <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
+        </div>
+      </div>
+
+      {/* Docinhos do Lote - SEMPRE ABERTO no PNG */}
+      <div>
+        <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
+          Docinhos do Lote ({calculations.candyDetails.length})
+        </h4>
+        <div className="space-y-2">
+          {calculations.candyDetails.map((item, idx) => (
+            <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+              <div className="flex-1">
+                <span className="text-white font-medium text-sm">{item.candy.name}</span>
+                <div className="text-white/60 text-xs">
+                  {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-green-400 font-semibold text-sm">
+                  R$ {item.totalRevenue.toFixed(2)}
+                </div>
+                <div className="text-green-300 text-xs">
+                  Lucro: R$ {item.totalProfit.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Massas Agrupadas - SEMPRE ABERTO no PNG */}
+      {Object.keys(calculations.massGroups).length > 0 && (
+        <div>
+          <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
+            Massas Agrupadas ({Object.keys(calculations.massGroups).length})
+          </h4>
+          <div className="space-y-3">
+            {Object.entries(calculations.massGroups).map(([massName, massData]) => {
+              // Filtrar apenas massas que têm pelo menos 1g após arredondamento
+              if (massData.totalGrams < 0.5) return null
+
+              const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
+              // Filtrar ingredientes que têm pelo menos 1g após arredondamento
+              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+
+              return (
+                <div key={massName} className="p-3 rounded-lg bg-white/5">
+                  <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
+                  <p className="text-white/60 text-xs mb-2">
+                    Total necessário: <strong>{roundGrams(massData.totalGrams)}g</strong>
+                  </p>
+                  
+                  <p className="text-white/60 text-xs mb-1">Docinhos que usam esta massa:</p>
+                  <div className="space-y-1 mb-3">
+                    {massData.candies.map((candyItem, idx) => (
+                      <div key={idx} className="flex justify-between text-xs text-white/60">
+                        <span>{candyItem.candy.name}</span>
+                        <span>
+                          {candyItem.quantity} un • {roundGrams(candyItem.grams)}g
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {validIngredients.length > 0 ? (
+                    <div>
+                      <p className="text-white/60 text-xs mb-1">Ingredientes necessários:</p>
+                      <div className="space-y-1">
+                        {validIngredients.map(([productName, data]) => (
+                          <div key={productName} className="flex justify-between text-xs">
+                            <span className="text-white">{productName}</span>
+                            <span className="text-green-300 font-semibold">
+                              {roundGrams(data.grams)}g
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-white/40 text-xs text-center py-1">
+                      Quantidades muito pequenas após arredondamento
+                    </p>
+                  )}
+                </div>
+              )
+            }).filter(Boolean)}
+          </div>
+        </div>
+      )}
+
+      {/* Informação sobre arredondamento */}
+      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+        <p className="text-blue-300 text-xs text-center">
+          💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g = 0g, 0.5g+ = inteiro mais próximo
+        </p>
+      </div>
+    </div>
+  )
 
   return (
     <Layout activePage="batch">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-primary mb-2">Calculadora de Lote</h1>
+        <h1 className="text-2xl md:text-4xl font-bold text-primary mb-2">Calculadora de Lote</h1>
         <p className="text-secondary">Calcule os ingredientes necessários agrupando massas iguais</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Seleção de Docinhos */}
         <GlassCard>
-          <h2 className="text-2xl font-bold text-primary mb-4 flex items-center gap-2">
+          <h2 className="text-xl md:text-2xl font-bold text-primary mb-4 flex items-center gap-2">
             <FaCalculator />
             Selecionar Docinhos
           </h2>
 
           <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
             {candies.map(candy => (
-              <div key={candy._id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 dark:bg-gray-800/50">
+              <div key={candy._id} className="flex items-center flex-col md:flex-row justify-between p-4 rounded-2xl bg-white/5 dark:bg-gray-800/50">
                 <div className="flex-1">
                   <h3 className="font-semibold text-primary">{candy.name}</h3>
                   <p className="text-secondary text-sm">
@@ -189,7 +348,7 @@ export default function BatchCalculator() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="mt-2 md:mt-0 flex items-center gap-2">
                   <button
                     onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) - 1)}
                     className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
@@ -229,12 +388,14 @@ export default function BatchCalculator() {
         {/* Resultados */}
         <GlassCard>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-primary">Resultados do Lote</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-primary">Resultados do Lote</h2>
             {calculations && (
-              <GlassButton onClick={printResults} variant="secondary">
-                <FaPrint />
-                Imprimir
-              </GlassButton>
+              <div className="flex gap-2">
+                <GlassButton onClick={saveAsPNG} variant="secondary" className="text-sm">
+                  <FaDownload />
+                  PNG
+                </GlassButton>
+              </div>
             )}
           </div>
 
@@ -391,6 +552,15 @@ export default function BatchCalculator() {
             💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g são considerados 0g, 
             valores de 0.5g ou mais são arredondados para o inteiro mais próximo.
           </p>
+        </div>
+      )}
+
+      {/* Componente oculto para o PNG - sempre expandido */}
+      {calculations && (
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+          <div ref={resultsRef}>
+            <ResultsForPNG />
+          </div>
         </div>
       )}
     </Layout>
