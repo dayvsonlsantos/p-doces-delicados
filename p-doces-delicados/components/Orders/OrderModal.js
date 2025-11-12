@@ -4,19 +4,18 @@ import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
 import { FaSave, FaTimes, FaPlus, FaTrash, FaCalculator, FaUser, FaBox } from 'react-icons/fa'
 
-export default function OrderModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  order, 
-  candies = [], 
-  cakes = [], 
-  supplies = [] 
+export default function OrderModal({
+  isOpen,
+  onClose,
+  onSave,
+  order,
+  candies = [],
+  cakes = [],
+  supplies = []
 }) {
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
-    customerEmail: '',
     deliveryDate: '',
     type: 'docinhos',
     status: 'encomendado',
@@ -46,7 +45,6 @@ export default function OrderModal({
       setFormData({
         customerName: order.customerName || '',
         customerPhone: order.customerPhone || '',
-        customerEmail: order.customerEmail || '',
         deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().split('T')[0] : '',
         type: order.type || 'docinhos',
         status: order.status || 'encomendado',
@@ -61,7 +59,6 @@ export default function OrderModal({
       setFormData({
         customerName: '',
         customerPhone: '',
-        customerEmail: '',
         deliveryDate: '',
         type: 'docinhos',
         status: 'encomendado',
@@ -105,7 +102,7 @@ export default function OrderModal({
     })
 
     const totalCost = Number(candiesCost) + Number(cakesCost) + Number(suppliesCost)
-    
+
     // Calcular margem de lucro baseada no custo total e preço de venda
     let profitMargin = 0
     if (totalCost > 0 && totalSalePrice > 0) {
@@ -140,9 +137,9 @@ export default function OrderModal({
     if (isCalculating) return
 
     const calculatedData = calculateOrderCostAndPrice(formData)
-    
+
     setCostBreakdown(calculatedData)
-    
+
     // Sempre atualizar os campos com os valores calculados automaticamente
     // A menos que o usuário esteja editando manualmente
     if (profitInputType === 'none') {
@@ -163,10 +160,10 @@ export default function OrderModal({
         const cake = cakes.find(c => c._id === item.itemId)
         unitCost = Number(cake?.costPerUnit) || 0
       }
-      
+
       const totalPrice = (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)
       const cost = unitCost * (Number(item.quantity) || 0)
-      
+
       return {
         ...item,
         totalPrice: totalPrice,
@@ -183,14 +180,14 @@ export default function OrderModal({
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { 
-        itemType: selectedType === 'docinhos' ? 'candy' : 'cake', 
-        itemId: '', 
-        itemName: '', 
-        quantity: 1, 
-        unitPrice: 0, 
+      items: [...prev.items, {
+        itemType: selectedType === 'docinhos' ? 'candy' : 'cake',
+        itemId: '',
+        itemName: '',
+        quantity: 1,
+        unitPrice: 0,
         totalPrice: 0,
-        cost: 0 
+        cost: 0
       }]
     }))
   }
@@ -203,7 +200,7 @@ export default function OrderModal({
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items]
     newItems[index][field] = value
-    
+
     // Atualizar nome e preço automaticamente quando selecionar item
     if (field === 'itemId') {
       if (newItems[index].itemType === 'candy') {
@@ -218,14 +215,14 @@ export default function OrderModal({
         newItems[index].unitPrice = cake?.salePrice || 0
       }
     }
-    
+
     // Calcular preço total do item automaticamente
     if (field === 'quantity' || field === 'unitPrice') {
       const quantity = Number(newItems[index].quantity) || 0
       const unitPrice = Number(newItems[index].unitPrice) || 0
       newItems[index].totalPrice = quantity * unitPrice
     }
-    
+
     setFormData(prev => ({ ...prev, items: newItems }))
   }
 
@@ -233,12 +230,12 @@ export default function OrderModal({
   const addSupply = () => {
     setFormData(prev => ({
       ...prev,
-      supplies: [...prev.supplies, { 
-        supplyId: '', 
-        supplyName: '', 
-        quantity: 1, 
-        unitCost: 0, 
-        totalCost: 0 
+      supplies: [...prev.supplies, {
+        supplyId: '',
+        supplyName: '',
+        quantity: 1,
+        unitCost: 0,
+        totalCost: 0
       }]
     }))
   }
@@ -251,34 +248,34 @@ export default function OrderModal({
   const updateSupply = (index, field, value) => {
     const newSupplies = [...formData.supplies]
     newSupplies[index][field] = value
-    
+
     if (field === 'supplyId') {
       const supply = supplies.find(s => s._id === value)
       newSupplies[index].supplyName = supply?.name || ''
       newSupplies[index].unitCost = Number(supply?.cost) || 0
     }
-    
+
     // Calcular custo total automaticamente
     if (field === 'quantity' || field === 'unitCost') {
       newSupplies[index].totalCost = (Number(newSupplies[index].quantity) || 0) * (Number(newSupplies[index].unitCost) || 0)
     }
-    
+
     setFormData(prev => ({ ...prev, supplies: newSupplies }))
   }
 
   // Funções para margem de lucro
   const handleProfitMarginChange = (value) => {
     setProfitInputType('percentage')
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       profitMargin: value
     }))
   }
 
   const handleSalePriceChange = (value) => {
     setProfitInputType('price')
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       salePrice: value
     }))
   }
@@ -289,24 +286,24 @@ export default function OrderModal({
       setProfitInputType('none')
       return
     }
-    
+
     setIsCalculating(true)
     const profitMarginValue = parseFloat(formData.profitMargin) || 0
     const calculatedSalePrice = calculateSalePrice(costBreakdown.totalCost, profitMarginValue)
-    
+
     setFormData(prev => ({
       ...prev,
       salePrice: calculatedSalePrice.toFixed(2),
       profitMargin: profitMarginValue.toFixed(1)
     }))
-    
+
     setCostBreakdown(prev => ({
       ...prev,
       salePrice: calculatedSalePrice,
       profit: calculatedSalePrice - prev.totalCost,
       profitMargin: profitMarginValue
     }))
-    
+
     setTimeout(() => {
       setIsCalculating(false)
       setProfitInputType('none')
@@ -318,27 +315,27 @@ export default function OrderModal({
       setProfitInputType('none')
       return
     }
-    
+
     setIsCalculating(true)
     const salePriceValue = parseFloat(formData.salePrice) || 0
     let profitMarginValue = 0
-    
+
     if (costBreakdown.totalCost > 0) {
       profitMarginValue = calculateProfitMargin(costBreakdown.totalCost, salePriceValue)
     }
-    
+
     setFormData(prev => ({
       ...prev,
       profitMargin: profitMarginValue.toFixed(1)
     }))
-    
+
     setCostBreakdown(prev => ({
       ...prev,
       salePrice: salePriceValue,
       profit: salePriceValue - prev.totalCost,
       profitMargin: profitMarginValue
     }))
-    
+
     setTimeout(() => {
       setIsCalculating(false)
       setProfitInputType('none')
@@ -347,7 +344,7 @@ export default function OrderModal({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     if (!formData.customerName || !formData.deliveryDate) {
       alert('Por favor, preencha o nome do cliente e a data de entrega')
       return
@@ -389,7 +386,7 @@ export default function OrderModal({
       isOpen={isOpen}
       onClose={onClose}
       title={order ? 'Editar Encomenda' : 'Nova Encomenda'}
-      size="lg" // Alterado para fullscreen no mobile
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-full">
         {/* Header fixo */}
@@ -411,7 +408,7 @@ export default function OrderModal({
             </p>
           </div>
 
-          {/* Informações do Cliente */}
+          {/* Informações do Cliente - REMOVIDO EMAIL */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
@@ -430,22 +427,18 @@ export default function OrderModal({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Email"
-                type="email"
-                value={formData.customerEmail}
-                onChange={(e) => setFormData(prev => ({ ...prev, customerEmail: e.target.value }))}
-                placeholder="cliente@email.com"
-              />
-
-              <Input
-                label="Data de Entrega *"
-                type="date"
-                value={formData.deliveryDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, deliveryDate: e.target.value }))}
-                required
-              />
+            {/* Data de Entrega - CORRIGIDA RESPONSIVIDADE */}
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-white/60 text-xs mb-2">Data de Entrega *</label>
+                <input
+                  type="date"
+                  value={formData.deliveryDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, deliveryDate: e.target.value }))}
+                  className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                  required
+                />
+              </div>
             </div>
           </div>
 
@@ -461,7 +454,7 @@ export default function OrderModal({
                 }}
                 className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                 required
-                style={{ 
+                style={{
                   WebkitAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                   backgroundRepeat: 'no-repeat',
@@ -482,7 +475,7 @@ export default function OrderModal({
                 onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                 className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                 required
-                style={{ 
+                style={{
                   WebkitAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                   backgroundRepeat: 'no-repeat',
@@ -505,8 +498,8 @@ export default function OrderModal({
               <div>
                 <h3 className="text-white font-semibold text-lg">Itens da Encomenda</h3>
                 <p className="text-white/60 text-sm">
-                  {selectedType === 'docinhos' ? 'Selecione os docinhos' : 
-                   selectedType === 'bolos' ? 'Selecione os bolos' : 'Selecione docinhos e bolos'}
+                  {selectedType === 'docinhos' ? 'Selecione os docinhos' :
+                    selectedType === 'bolos' ? 'Selecione os bolos' : 'Selecione docinhos e bolos'}
                 </p>
               </div>
               <button
@@ -544,7 +537,7 @@ export default function OrderModal({
                         onChange={(e) => updateItem(index, 'itemId', e.target.value)}
                         className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                         required
-                        style={{ 
+                        style={{
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                           backgroundRepeat: 'no-repeat',
@@ -643,7 +636,7 @@ export default function OrderModal({
                         value={supply.supplyId}
                         onChange={(e) => updateSupply(index, 'supplyId', e.target.value)}
                         className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                        style={{ 
+                        style={{
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                           backgroundRepeat: 'no-repeat',
@@ -787,9 +780,8 @@ export default function OrderModal({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-white/80">Margem de lucro:</span>
-                    <span className={`font-semibold ${
-                      costBreakdown.profitMargin >= 0 ? 'text-green-300' : 'text-red-300'
-                    }`}>
+                    <span className={`font-semibold ${costBreakdown.profitMargin >= 0 ? 'text-green-300' : 'text-red-300'
+                      }`}>
                       {costBreakdown.profitMargin.toFixed(1)}%
                     </span>
                   </div>

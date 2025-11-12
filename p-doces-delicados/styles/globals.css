@@ -472,3 +472,46 @@ select.glass-input option {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
+
+/* ========== LOGIN COM CORES MAIS ESCURAS ========== */
+body.dark .login-background {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary-hue, 210), calc(var(--primary-saturation, 80%) * 0.2), 6%) 0%,
+    hsl(var(--primary-hue, 210), calc(var(--primary-saturation, 80%) * 0.15), 10%) 50%,
+    hsl(var(--primary-hue, 210), calc(var(--primary-saturation, 80%) * 0.1), 14%) 100%
+  ) !important;
+}
+
+/* Inputs do login com cores mais escuras */
+body.dark .login-input {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+body.dark .login-input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+body.dark .login-input:focus {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  outline: none;
+}
+
+/* Card do login mais escuro */
+body.dark .login-card {
+  background: rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Textos do login com contraste melhor */
+body.dark .login-text-primary {
+  color: white !important;
+}
+
+body.dark .login-text-secondary {
+  color: rgba(255, 255, 255, 0.6) !important;
+}

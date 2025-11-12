@@ -27,41 +27,6 @@
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/cakes": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/cakes.js"
-    ],
-    "/cakes/batch": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/cakes/batch.js"
-    ],
-    "/cakes/frostings": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/cakes/frostings.js"
-    ],
-    "/cakes/masses": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/cakes/masses.js"
-    ],
-    "/candies": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/candies.js"
-    ],
-    "/candies/batch": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/candies/batch.js"
-    ],
-    "/candies/masses": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/candies/masses.js"
-    ],
     "/login": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",

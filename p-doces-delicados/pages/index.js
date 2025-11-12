@@ -1,11 +1,10 @@
-// pages/index.js (Dashboard)
 import Layout from '../components/Layout/Layout'
 import GlassCard from '../components/UI/GlassCard'
 import { useState, useEffect } from 'react'
 import { 
   FaBox, FaTag, FaCookie, FaBirthdayCake, 
   FaArrowRight, FaWeight, FaIceCream, 
-  FaCalculator
+  FaCalculator, FaClipboardList
 } from 'react-icons/fa'
 import { useRouter } from 'next/router'
 
@@ -17,7 +16,8 @@ export default function Dashboard() {
     candies: 0,
     cakeMasses: 0,
     cakeFrostings: 0,
-    cakes: 0
+    cakes: 0,
+    orders: 0
   })
 
   const router = useRouter()
@@ -30,7 +30,7 @@ export default function Dashboard() {
     try {
       const [
         productsRes, suppliesRes, candyMassesRes, candiesRes,
-        cakeMassesRes, cakeFrostingsRes, cakesRes
+        cakeMassesRes, cakeFrostingsRes, cakesRes, ordersRes
       ] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/supplies'),
@@ -38,7 +38,8 @@ export default function Dashboard() {
         fetch('/api/candies'),
         fetch('/api/cake-masses'),
         fetch('/api/cake-frostings'),
-        fetch('/api/cakes')
+        fetch('/api/cakes'),
+        fetch('/api/orders')
       ])
       
       setStats({
@@ -48,7 +49,8 @@ export default function Dashboard() {
         candies: (await candiesRes.json()).length,
         cakeMasses: (await cakeMassesRes.json()).length,
         cakeFrostings: (await cakeFrostingsRes.json()).length,
-        cakes: (await cakesRes.json()).length
+        cakes: (await cakesRes.json()).length,
+        orders: (await ordersRes.json()).length
       })
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error)
@@ -59,10 +61,17 @@ export default function Dashboard() {
     router.push(path)
   }
 
-  const QuickActionCard = ({ icon: Icon, title, description, path, color }) => (
+  // Função específica para abrir a calculadora de encomendas
+  const openCalculator = () => {
+    console.log('🔢 Abrindo calculadora de encomendas...')
+    // Navega para a página de encomendas com o parâmetro para abrir a calculadora
+    router.push('/orders?calculator=true')
+  }
+
+  const QuickActionCard = ({ icon: Icon, title, description, path, color, onClick }) => (
     <div 
-      className="cursor-pointer"
-      onClick={() => navigateTo(path)}
+      className="cursor-pointer group"
+      onClick={onClick ? onClick : () => navigateTo(path)}
     >
       <GlassCard className="hover:scale-105 transition-transform duration-300 h-full btn-mobile">
         <div className="text-center">
@@ -124,11 +133,11 @@ export default function Dashboard() {
         <GlassCard className="p-3 md:p-4">
           <div className="flex items-center gap-2 md:gap-4">
             <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white">
-              <FaCookie size={16} className="md:w-5 md:h-5" />
+              <FaClipboardList size={16} className="md:w-5 md:h-5" />
             </div>
             <div>
-              <p className="text-secondary text-xs md:text-sm">Docinhos</p>
-              <p className="text-xl md:text-2xl font-bold text-primary">{stats.candies}</p>
+              <p className="text-secondary text-xs md:text-sm">Encomendas</p>
+              <p className="text-xl md:text-2xl font-bold text-primary">{stats.orders}</p>
             </div>
           </div>
         </GlassCard>
@@ -144,6 +153,31 @@ export default function Dashboard() {
             </div>
           </div>
         </GlassCard>
+      </div>
+
+      {/* Ação Rápida - Encomendas */}
+      <div className="mb-6 md:mb-8">
+        <h2 className="text-xl md:text-2xl font-bold text-primary mb-3 md:mb-4 flex items-center gap-2">
+          <FaClipboardList className="w-4 h-4 md:w-5 md:h-5" />
+          Encomendas
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <QuickActionCard
+            icon={FaClipboardList}
+            title="Encomendas"
+            description="Gerenciar encomendas de docinhos e bolos"
+            path="/orders"
+            color="bg-indigo-500"
+          />
+
+          <QuickActionCard
+            icon={FaCalculator}
+            title="Calculadora"
+            description="Calcular ingredientes para produção"
+            onClick={openCalculator} // Agora usa a função específica
+            color="bg-teal-500"
+          />
+        </div>
       </div>
 
       {/* Ações Rápidas - Docinhos */}

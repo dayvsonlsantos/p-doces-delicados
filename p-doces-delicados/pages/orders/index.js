@@ -6,6 +6,7 @@ import OrderList from '../../components/Orders/OrderList'
 import CalculatorModal from '../../components/Orders/CalculatorModal'
 import { useState, useEffect } from 'react'
 import { FaPlus, FaCalculator } from 'react-icons/fa'
+import { useRouter } from 'next/router'
 
 export default function Orders() {
   const [orders, setOrders] = useState([])
@@ -19,9 +20,27 @@ export default function Orders() {
   const [editingOrder, setEditingOrder] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const router = useRouter()
+  const { calculator } = router.query
+
   useEffect(() => {
     loadData()
   }, [])
+
+  // CORREÇÃO: Detectar parâmetro da calculadora
+  useEffect(() => {
+    console.log('🔍 Verificando parâmetro calculator:', calculator)
+    if (calculator === 'true') {
+      console.log('🎯 Abrindo calculadora automaticamente...')
+      setIsCalculatorModalOpen(true)
+
+      // Remove o parâmetro da URL sem recarregar a página
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('calculator')
+      window.history.replaceState({}, '', newUrl.toString())
+      console.log('🔄 URL atualizada:', newUrl.toString())
+    }
+  }, [calculator])
 
   const loadData = async () => {
     try {
@@ -47,6 +66,12 @@ export default function Orders() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // CORREÇÃO: Função para fechar a calculadora
+  const handleCloseCalculator = () => {
+    console.log('🗑️ Fechando calculadora...')
+    setIsCalculatorModalOpen(false)
   }
 
   const handleSave = async (orderData) => {
@@ -114,7 +139,7 @@ export default function Orders() {
     console.log('Itens selecionados para cálculo:', selectedItems)
     const totalItems = selectedItems.length
     const totalQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0)
-    
+
     alert(`✅ ${totalItems} tipos de itens selecionados\n📦 ${totalQuantity} unidades no total\n\nOs ingredientes foram calculados com sucesso!`)
   }
 
@@ -178,9 +203,10 @@ export default function Orders() {
         supplies={supplies}
       />
 
+      {/* CORREÇÃO: Passar a função correta para fechar */}
       <CalculatorModal
         isOpen={isCalculatorModalOpen}
-        onClose={() => setIsCalculatorModalOpen(false)}
+        onClose={handleCloseCalculator} // Usar a função corrigida
         orders={orders}
         candies={candies}
         cakes={cakes}
