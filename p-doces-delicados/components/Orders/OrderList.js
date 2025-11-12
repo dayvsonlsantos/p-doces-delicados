@@ -22,7 +22,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
   useEffect(() => {
     const endDate = new Date()
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 7)
+    endDate.setDate(startDate.getDate() + 7)
 
     setFilters(prev => ({
       ...prev,
@@ -196,7 +196,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
   const clearFilters = () => {
     const endDate = new Date()
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 7)
+    endDate.setDate(startDate.getDate() + 7)
 
     setFilters({
       type: 'all',
@@ -211,7 +211,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
   const setDateRange = (days) => {
     const endDate = new Date()
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
+    endDate.setDate(startDate.getDate() + days)
 
     setFilters(prev => ({
       ...prev,
@@ -288,30 +288,44 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setDateRange(7)}
-              className={`px-3 py-2 text-sm rounded-xl transition-colors ${filters.startDate === formatDateForInput(new Date(new Date().setDate(new Date().getDate() - 7)))
-                ? 'bg-primary-500 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white/60'
+              className={`px-3 py-2 text-sm rounded-xl transition-colors ${
+                // Verifica se o filtro atual corresponde ao período de 7 dias à frente
+                filters.endDate === formatDateForInput(new Date(new Date().setDate(new Date().getDate() + 7)))
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white/10 hover:bg-white/20 text-white/60'
                 }`}
             >
               7 dias
             </button>
             <button
               onClick={() => setDateRange(30)}
-              className={`px-3 py-2 text-sm rounded-xl transition-colors ${filters.startDate === formatDateForInput(new Date(new Date().setDate(new Date().getDate() - 30)))
-                ? 'bg-primary-500 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white/60'
+              className={`px-3 py-2 text-sm rounded-xl transition-colors ${filters.endDate === formatDateForInput(new Date(new Date().setDate(new Date().getDate() + 30)))
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white/10 hover:bg-white/20 text-white/60'
                 }`}
             >
               30 dias
             </button>
             <button
               onClick={() => setDateRange(90)}
-              className={`px-3 py-2 text-sm rounded-xl transition-colors ${filters.startDate === formatDateForInput(new Date(new Date().setDate(new Date().getDate() - 90)))
-                ? 'bg-primary-500 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white/60'
+              className={`px-3 py-2 text-sm rounded-xl transition-colors ${filters.endDate === formatDateForInput(new Date(new Date().setDate(new Date().getDate() + 90)))
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white/10 hover:bg-white/20 text-white/60'
                 }`}
             >
               90 dias
+            </button>
+            <button
+              onClick={() => {
+                setFilters(prev => ({
+                  ...prev,
+                  startDate: '',
+                  endDate: ''
+                }))
+              }}
+              className="px-3 py-2 text-sm bg-white/10 hover:bg-white/20 text-white/60 rounded-xl transition-colors"
+            >
+              Todas as datas
             </button>
             <button
               onClick={() => {
@@ -406,7 +420,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full h-12 px-4 pr-10 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
+                className="w-full h-12 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
                 ref={startDateRef}
               />
               <button
@@ -427,7 +441,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full h-12 px-4 pr-10 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
+                className="w-full h-12 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
                 ref={endDateRef}
               />
               <button

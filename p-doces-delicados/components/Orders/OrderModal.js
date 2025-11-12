@@ -1160,7 +1160,7 @@ export default function OrderModal({
                           type="date"
                           value={part.dueDate}
                           onChange={(e) => updatePaymentPart(index, 'dueDate', e.target.value)}
-                          className="w-full h-10 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent [&::-webkit-calendar-picker-indicator]:opacity-0"
+                          className="w-full h-10 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent [&::-webkit-calendar-picker-indicator]:opacity-0"
                           required
                           ref={endPaymentDateRef}
                         />

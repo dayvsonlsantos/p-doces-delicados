@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { 
   FaBox, FaTag, FaCookie, FaBirthdayCake, 
   FaArrowRight, FaWeight, FaIceCream, 
-  FaCalculator, FaClipboardList
+  FaCalculator, FaClipboardList,
+  FaMoneyBillWave, FaChartLine, FaDollarSign
 } from 'react-icons/fa'
 import { useRouter } from 'next/router'
 
@@ -20,10 +21,17 @@ export default function Dashboard() {
     orders: 0
   })
 
+  const [financialStats, setFinancialStats] = useState({
+    expenses: 0,
+    projectedProfit: 0,
+    confirmedProfit: 0
+  })
+
   const router = useRouter()
 
   useEffect(() => {
     loadStats()
+    loadFinancialStats()
   }, [])
 
   const loadStats = async () => {
@@ -57,14 +65,67 @@ export default function Dashboard() {
     }
   }
 
+  const loadFinancialStats = async () => {
+    try {
+      const ordersRes = await fetch('/api/orders')
+      const orders = await ordersRes.json()
+
+      const now = new Date()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+
+      let totalExpenses = 0
+      let totalProjectedProfit = 0
+      let totalConfirmedProfit = 0
+
+      orders.forEach(order => {
+        const orderDate = new Date(order.deliveryDate || order.createdAt)
+        
+        // Verifica se a encomenda é do mês atual
+        if (orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear) {
+          
+          // Cálculo de despesas (custo total)
+          const orderCost = order.costBreakdown?.totalCost || 
+                           (order.items?.reduce((sum, item) => sum + (item.cost || 0), 0) || 0)
+          totalExpenses += orderCost
+
+          // Cálculo do lucro projetado (todas as encomendas)
+          const orderRevenue = order.finalPrice || order.costBreakdown?.salePrice || 0
+          const orderProfit = orderRevenue - orderCost
+          totalProjectedProfit += orderProfit
+
+          // Cálculo do lucro confirmado (apenas encomendas pagas)
+          if (order.paymentStatus === 'paid') {
+            totalConfirmedProfit += orderProfit
+          } else if (order.paymentStatus === 'partial' && order.paymentParts) {
+            // Para pagamentos parciais, considerar apenas a parte paga
+            const paidAmount = order.paymentParts
+              .filter(part => part.paid)
+              .reduce((sum, part) => sum + (part.amount || 0), 0)
+            
+            // Calcular o lucro proporcional ao valor pago
+            const paidRatio = paidAmount / orderRevenue
+            totalConfirmedProfit += orderProfit * paidRatio
+          }
+        }
+      })
+
+      setFinancialStats({
+        expenses: totalExpenses,
+        projectedProfit: totalProjectedProfit,
+        confirmedProfit: totalConfirmedProfit
+      })
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas financeiras:', error)
+    }
+  }
+
   const navigateTo = (path) => {
     router.push(path)
   }
 
-  // Função específica para abrir a calculadora de encomendas
   const openCalculator = () => {
     console.log('🔢 Abrindo calculadora de encomendas...')
-    // Navega para a página de encomendas com o parâmetro para abrir a calculadora
     router.push('/orders?calculator=true')
   }
 
@@ -104,7 +165,68 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Estatísticas Gerais - Grid responsivo */}
+      {/* Estatísticas Financeiras - NOVO BLOCO */}
+      <div className="mb-6 md:mb-8">
+        <h2 className="text-xl md:text-2xl font-bold text-primary mb-3 md:mb-4 flex items-center gap-2">
+          <FaChartLine className="w-4 h-4 md:w-5 md:h-5" />
+          Financeiro do Mês
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+          {/* Despesas */}
+          <GlassCard className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-red-500 flex items-center justify-center text-white">
+                <FaMoneyBillWave size={16} className="md:w-5 md:h-5" />
+              </div>
+              <div>
+                <p className="text-secondary text-xs md:text-sm">Despesas</p>
+                <p className="text-xl md:text-2xl font-bold text-red-400">
+                  R$ {financialStats.expenses.toFixed(2)}
+                </p>
+                <p className="text-white/60 text-xs">Custo total das encomendas</p>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Lucro Projetado */}
+          <GlassCard className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white">
+                <FaChartLine size={16} className="md:w-5 md:h-5" />
+              </div>
+              <div>
+                <p className="text-secondary text-xs md:text-sm">Lucro Projetado</p>
+                <p className={`text-xl md:text-2xl font-bold ${
+                  financialStats.projectedProfit >= 0 ? 'text-blue-400' : 'text-red-400'
+                }`}>
+                  R$ {financialStats.projectedProfit.toFixed(2)}
+                </p>
+                <p className="text-white/60 text-xs">Todas as encomendas</p>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Lucro Confirmado */}
+          <GlassCard className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="w-8 h-8 md:w-12 md:h-12 rounded-2xl bg-green-500 flex items-center justify-center text-white">
+                <FaDollarSign size={16} className="md:w-5 md:h-5" />
+              </div>
+              <div>
+                <p className="text-secondary text-xs md:text-sm">Lucro Confirmado</p>
+                <p className={`text-xl md:text-2xl font-bold ${
+                  financialStats.confirmedProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  R$ {financialStats.confirmedProfit.toFixed(2)}
+                </p>
+                <p className="text-white/60 text-xs">Encomendas pagas</p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      </div>
+
+      {/* Estatísticas Gerais */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <GlassCard className="p-3 md:p-4">
           <div className="flex items-center gap-2 md:gap-4">
@@ -174,7 +296,7 @@ export default function Dashboard() {
             icon={FaCalculator}
             title="Calculadora"
             description="Calcular ingredientes para produção"
-            onClick={openCalculator} // Agora usa a função específica
+            onClick={openCalculator}
             color="bg-teal-500"
           />
         </div>
