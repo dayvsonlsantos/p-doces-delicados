@@ -40,9 +40,6 @@ export default function StatusBarFix() {
         // Método 3: Injetar CSS direto na página para alguns browsers
         injectDarkStatusBarCSS()
 
-        // Método 4: Forçar via JavaScript injection múltiplas vezes
-        forceViaJavaScript()
-
       } catch (error) {
         console.error('❌ Erro ao forçar barra de status:', error)
       }
@@ -73,23 +70,6 @@ export default function StatusBarFix() {
         `
         document.head.appendChild(style)
       }
-    }
-
-    const forceViaJavaScript = () => {
-      // Executar múltiplas vezes para garantir
-      const attempts = [0, 100, 500, 1000, 2000]
-      
-      attempts.forEach(delay => {
-        setTimeout(() => {
-          try {
-            const meta = document.querySelector('meta[name="theme-color"]')
-            if (meta && theme === 'dark') {
-              meta.content = '#000000'
-              console.log(`⏱️ Tentativa ${delay}ms: theme-color atualizado`)
-            }
-          } catch (e) {}
-        }, delay)
-      })
     }
 
     // Executar imediatamente

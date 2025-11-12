@@ -3,14 +3,14 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/": "pages/index.js",
+  "/api/candies": "pages/api/candies.js",
   "/orders": "pages/orders.js",
   "/api/orders": "pages/api/orders.js",
-  "/api/cakes": "pages/api/cakes.js",
-  "/api/products": "pages/api/products.js",
-  "/api/candies": "pages/api/candies.js",
   "/api/supplies": "pages/api/supplies.js",
   "/api/masses": "pages/api/masses.js",
-  "/login": "pages/login.js",
+  "/api/cakes": "pages/api/cakes.js",
+  "/api/products": "pages/api/products.js",
   "/api/cake-masses": "pages/api/cake-masses.js",
+  "/login": "pages/login.js",
   "/api/cake-frostings": "pages/api/cake-frostings.js"
 }

@@ -74,6 +74,7 @@ export default function Orders() {
     setIsCalculatorModalOpen(false)
   }
 
+  // pages/orders.js (função handleSave corrigida)
   const handleSave = async (orderData) => {
     try {
       let url = '/api/orders'
@@ -94,13 +95,18 @@ export default function Orders() {
         body: JSON.stringify(body)
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        throw new Error('Erro ao salvar encomenda')
+        throw new Error(result.error || 'Erro ao salvar encomenda')
       }
 
+      // CORREÇÃO: Recarregar os dados após salvar
       await loadData()
+
       setIsOrderModalOpen(false)
       setEditingOrder(null)
+
       alert(editingOrder ? 'Encomenda atualizada com sucesso!' : 'Encomenda criada com sucesso!')
     } catch (error) {
       console.error('Erro ao salvar encomenda:', error)

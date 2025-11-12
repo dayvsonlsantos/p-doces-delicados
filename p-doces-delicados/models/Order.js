@@ -4,7 +4,6 @@ export const Order = {
   orderNumber: String, // Número único da encomenda
   customerName: String,
   customerPhone: String,
-  customerEmail: String,
   deliveryDate: Date,
   status: {
     type: String,
@@ -33,6 +32,46 @@ export const Order = {
     totalCost: Number
   }],
   observations: String,
+  
+  // NOVOS CAMPOS DE PAGAMENTO
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'partial'],
+    default: 'pending'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['money', 'card', 'pix', 'transfer'],
+    default: 'money'
+  },
+  discount: {
+    type: Number,
+    default: 0
+  },
+  discountType: {
+    type: String,
+    enum: ['percentage', 'fixed'],
+    default: 'percentage'
+  },
+  finalPrice: {
+    type: Number,
+    default: 0
+  },
+  paymentParts: [{
+    amount: Number,
+    dueDate: Date,
+    paid: {
+      type: Boolean,
+      default: false
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['money', 'card', 'pix', 'transfer'],
+      default: 'money'
+    },
+    paidAt: Date
+  }],
+  
   costBreakdown: {
     candiesCost: Number,
     cakesCost: Number,
