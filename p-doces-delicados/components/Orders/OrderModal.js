@@ -1160,7 +1160,7 @@ export default function OrderModal({
                           type="date"
                           value={part.dueDate}
                           onChange={(e) => updatePaymentPart(index, 'dueDate', e.target.value)}
-                          className="w-full h-10 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent [&::-webkit-calendar-picker-indicator]:opacity-0"
+                          className="w-full glass-input h-10 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent [&::-webkit-calendar-picker-indicator]:opacity-0"
                           required
                           ref={endPaymentDateRef}
                         />
@@ -1180,7 +1180,7 @@ export default function OrderModal({
                       <select
                         value={part.paid ? 'paid' : 'pending'}
                         onChange={(e) => updatePaymentPart(index, 'paid', e.target.value === 'paid')}
-                        className="w-full h-10 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                        className="w-full glass-input h-10 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                         style={{
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
@@ -1256,4 +1256,5 @@ export default function OrderModal({
       </form>
     </Modal>
   )
+
 }
