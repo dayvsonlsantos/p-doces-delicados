@@ -435,7 +435,7 @@ export default function OrderModal({
                   type="date"
                   value={formData.deliveryDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, deliveryDate: e.target.value }))}
-                  className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                  className="w-full h-12 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                   required
                 />
               </div>
