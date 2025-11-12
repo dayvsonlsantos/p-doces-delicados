@@ -1155,22 +1155,22 @@ export default function OrderModal({
 
                     <div>
                       <label className="block text-white/60 text-xs mb-2">Data de Vencimento</label>
-                      <div className='relative'>
+                      <div className='flex items-center relative'>
                         <input
                           type="date"
                           value={part.dueDate}
                           onChange={(e) => updatePaymentPart(index, 'dueDate', e.target.value)}
-                          className="w-full glass-input h-10 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent [&::-webkit-calendar-picker-indicator]:opacity-0"
+                          className="w-full glass-input h-10 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent [&::-webkit-calendar-picker-indicator]:opacity-0 pr-10" /* Adicione padding right */
                           required
                           ref={endPaymentDateRef}
                         />
-                        <button
-                          type="button"
-                          onClick={() => endPaymentDateRef.current?.showPicker()}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white/60 transition-colors"
-                        >
-                          <FaCalendar />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => endPaymentDateRef.current?.showPicker()}
+                            className="absolute right-3 text-white/40 hover:text-white/60 transition-colors z-10" /* Adicione z-index */
+                          >
+                            <FaCalendar />
+                          </button>
                       </div>
                     </div>
 
@@ -1258,3 +1258,4 @@ export default function OrderModal({
   )
 
 }
+
