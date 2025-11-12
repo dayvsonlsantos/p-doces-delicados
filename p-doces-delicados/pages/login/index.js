@@ -7,6 +7,7 @@ import GlassButton from '../../components/UI/GlassButton'
 import Input from '../../components/UI/Input'
 import { FaCookieBite, FaSignInAlt, FaSpinner, FaExclamationTriangle } from 'react-icons/fa'
 import Image from 'next/image'
+import StatusBarFix from '../../components/PWA/StatusBarFix'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -23,34 +24,34 @@ export default function Login() {
       const body = document.body
       const html = document.documentElement
       const root = document.documentElement
-      
+
       // Remove classes de tema anteriores
       body.classList.remove('light', 'dark')
       html.classList.remove('light', 'dark')
-      
+
       // Aplica o tema atual
       body.classList.add(theme)
       html.classList.add(theme)
-      
+
       // Carrega as cores personalizadas do localStorage
       const savedColors = localStorage.getItem('colorSettings')
       if (savedColors) {
         try {
           const colorSettings = JSON.parse(savedColors)
           const { hue, saturation, lightness } = colorSettings
-          
+
           console.log('🎨 Aplicando cores personalizadas no login:', colorSettings)
-          
+
           // Aplica cores personalizadas (MAIS SUAVES)
           root.style.setProperty('--primary-hue', hue)
           root.style.setProperty('--primary-saturation', `${saturation}%`)
           root.style.setProperty('--primary-lightness', `${lightness}%`)
-          
+
           // Calcula cores derivadas MAIS SUAVES
           const primaryColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`
           const primaryLight = `hsl(${hue}, ${saturation}%, ${lightness + 10}%)`
           const primaryDark = `hsl(${hue}, ${saturation}%, ${lightness - 10}%)`
-          
+
           // Aplica cores derivadas
           root.style.setProperty('--primary-color-dynamic', primaryColor)
           root.style.setProperty('--primary-color-light', primaryLight)
@@ -82,7 +83,7 @@ export default function Login() {
   // Função para aplicar cores padrão
   const applyDefaultColors = (currentTheme) => {
     const body = document.body
-    
+
     if (currentTheme === 'dark') {
       body.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)'
     } else {
@@ -124,6 +125,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 transition-all duration-300">
+      <StatusBarFix />
       <div className="w-full max-w-md">
         <GlassCard className="w-full">
           <div className="text-center mb-8 flex items-center justify-center flex-col">

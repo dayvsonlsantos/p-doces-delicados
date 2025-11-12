@@ -9,7 +9,7 @@ export function useColorSettings() {
   })
 
   const [isInitialized, setIsInitialized] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false) // Adicione este estado
+  const [hasChanges, setHasChanges] = useState(false)
 
   // Carregar configurações do localStorage
   useEffect(() => {
@@ -20,16 +20,23 @@ export function useColorSettings() {
         console.log('📁 Carregando cores salvas:', settings)
         setColorSettings(settings)
         applySavedColorToCSS(settings.hue, settings.saturation, settings.lightness)
+        updatePWAThemeColor(settings.hue, settings.saturation, settings.lightness)
       } catch (error) {
         console.error('Erro ao carregar cores:', error)
-        applySavedColorToCSS(210, 80, 60)
+        applyDefaultColors()
       }
     } else {
       console.log('🎨 Usando cores padrão')
-      applySavedColorToCSS(210, 80, 60)
+      applyDefaultColors()
     }
     setIsInitialized(true)
   }, [])
+
+  // Aplicar cores padrão
+  const applyDefaultColors = () => {
+    applySavedColorToCSS(210, 80, 60)
+    updatePWAThemeColor(210, 80, 60)
+  }
 
   // Aplicar preview (modo temporário)
   const applyPreviewColor = (hue, saturation, lightness) => {
@@ -49,38 +56,86 @@ export function useColorSettings() {
 
       // Aplica gradiente de preview
       body.style.background = `linear-gradient(135deg, 
-        hsl(${hue}, ${Math.max(saturation * 0.6, 40)}%, 15%) 0%,
-        hsl(${hue + 30}, ${Math.max(saturation * 0.5, 35)}%, 20%) 50%,
-        hsl(${hue + 60}, ${Math.max(saturation * 0.4, 30)}%, 25%) 100%
+        hsl(${hue}, ${Math.max(saturation * 0.2, 10)}%, 6%) 0%,
+        hsl(${hue}, ${Math.max(saturation * 0.15, 8)}%, 10%) 50%,
+        hsl(${hue}, ${Math.max(saturation * 0.1, 5)}%, 14%) 100%
       )`
     }
   }
 
-  // Remover preview e voltar às cores salvas
+  // Atualizar PWA theme color - CORREÇÃO FORTE
+  const updatePWAThemeColor = (hue, saturation, lightness) => {
+    try {
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+      const appleStatusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+
+      if (document.body.classList.contains('dark')) {
+        // Modo escuro - cor extremamente escura
+        const darkColor = `hsl(${hue}, ${Math.max(saturation * 0.05, 2)}%, 2%)`
+
+        if (themeColorMeta) {
+          themeColorMeta.setAttribute('content', darkColor)
+          console.log('🌙 PWA theme-color FORÇADO (escuro):', darkColor)
+        }
+
+        if (appleStatusBar) {
+          appleStatusBar.setAttribute('content', 'black-translucent')
+        }
+
+        // Método alternativo para alguns browsers
+        forceThemeColorUpdate(darkColor)
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar PWA theme-color:', error)
+    }
+  }
+
+  // Método alternativo para forçar atualização
+  const forceThemeColorUpdate = (color) => {
+    // Criar um novo meta tag se necessário
+    let themeColorMeta = document.querySelector('meta[name="theme-color"]')
+    if (!themeColorMeta) {
+      themeColorMeta = document.createElement('meta')
+      themeColorMeta.name = 'theme-color'
+      document.head.appendChild(themeColorMeta)
+    }
+    themeColorMeta.content = color
+
+    // Também tentar atualizar via JavaScript injection
+    const script = document.createElement('script')
+    script.textContent = `
+      try {
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.content = '${color}';
+        
+        // Para iOS
+        const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (appleMeta) appleMeta.content = 'black-translucent';
+      } catch(e) {}
+    `
+    document.head.appendChild(script)
+    setTimeout(() => document.head.removeChild(script), 100)
+  }
+
   const removePreview = () => {
     const body = document.body
     body.classList.remove('color-preview')
-
-    // Reaplica as cores salvas
     applySavedColorToCSS(colorSettings.hue, colorSettings.saturation, colorSettings.lightness)
-    setHasChanges(false) // Reseta as mudanças ao remover preview
+    setHasChanges(false)
   }
 
   const updateColorSettings = (newSettings, isPreview = false) => {
     console.log('🔄 Atualizando configurações:', { newSettings, isPreview })
 
     if (isPreview) {
-      // Modo preview - aplica temporariamente
       const { hue, saturation, lightness } = { ...colorSettings, ...newSettings }
       applyPreviewColor(hue, saturation, lightness)
       return { ...colorSettings, ...newSettings }
     } else {
-      // Modo save - aplica permanentemente
       const updatedSettings = { ...colorSettings, ...newSettings }
 
       console.log('💾 SALVANDO configurações:', updatedSettings)
 
-      // Recalcula a cor primária se HSL mudou
       if (newSettings.hue !== undefined || newSettings.saturation !== undefined || newSettings.lightness !== undefined) {
         const hue = newSettings.hue !== undefined ? newSettings.hue : colorSettings.hue
         const saturation = newSettings.saturation !== undefined ? newSettings.saturation : colorSettings.saturation
@@ -88,11 +143,12 @@ export function useColorSettings() {
 
         updatedSettings.primaryColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`
         applySavedColorToCSS(hue, saturation, lightness)
+        updatePWAThemeColor(hue, saturation, lightness)
       }
 
       setColorSettings(updatedSettings)
       localStorage.setItem('colorSettings', JSON.stringify(updatedSettings))
-      setHasChanges(false) // Reseta mudanças após salvar
+      setHasChanges(false)
 
       return updatedSettings
     }
@@ -106,10 +162,9 @@ export function useColorSettings() {
       lightness: 60,
       primaryColor: 'hsl(210, 80%, 60%)'
     }
-    // Apenas atualiza o estado local, não salva ainda
     setColorSettings(defaultSettings)
-    applyPreviewColor(210, 80, 60) // Aplica preview do reset
-    setHasChanges(true) // GARANTE que há mudanças não salvas
+    applyPreviewColor(210, 80, 60)
+    setHasChanges(true)
     return defaultSettings
   }
 
@@ -120,63 +175,64 @@ export function useColorSettings() {
         const settings = JSON.parse(saved)
         console.log('🔄 Forçando atualização de cores:', settings)
         applySavedColorToCSS(settings.hue, settings.saturation, settings.lightness)
+        updatePWAThemeColor(settings.hue, settings.saturation, settings.lightness)
       } catch (error) {
         console.error('Erro ao forçar atualização de cores:', error)
       }
     }
   }
 
-  // Adicione esta função ao hook useColorSettings
-  const updatePWAThemeColor = (hue, saturation, lightness) => {
+  // Adicione esta função ao hook
+  const syncStatusBarWithNavbar = (hue, saturation, lightness) => {
     try {
-      const themeColorMeta = document.getElementById('theme-color-meta');
-      if (themeColorMeta) {
-        // Calcula uma cor escura para o theme-color (barra de status)
-        const darkColor = `hsl(${hue}, ${Math.max(saturation * 0.4, 20)}%, 8%)`;
-        themeColorMeta.setAttribute('content', darkColor);
-        console.log('🎨 PWA theme-color atualizado:', darkColor);
+      const navbarColor = `hsl(${hue}, ${Math.max(saturation * 0.3, 15)}%, 8%)`
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+
+      if (themeColorMeta && document.body.classList.contains('dark')) {
+        themeColorMeta.content = navbarColor
+        console.log('🔄 Barra de status sincronizada com navbar:', navbarColor)
       }
     } catch (error) {
-      console.error('Erro ao atualizar PWA theme-color:', error);
+      console.error('Erro ao sincronizar barra de status:', error)
     }
   }
 
-  // Modifique a função applySavedColorToCSS para incluir a atualização do PWA
+  // Atualize a função applySavedColorToCSS para incluir a sincronização
   const applySavedColorToCSS = (hue, saturation, lightness) => {
-    const root = document.documentElement;
-    const body = document.body;
+    const root = document.documentElement
+    const body = document.body
 
-    console.log('💾 Aplicando cor SALVA no CSS:', { hue, saturation, lightness });
+    console.log('💾 Aplicando cor SALVA no CSS:', { hue, saturation, lightness })
 
     // Remove qualquer preview anterior
-    body.classList.remove('color-preview');
+    body.classList.remove('color-preview')
 
     // Aplica as variáveis CSS permanentes
-    root.style.setProperty('--primary-hue', hue);
-    root.style.setProperty('--primary-saturation', `${saturation}%`);
-    root.style.setProperty('--primary-lightness', `${lightness}%`);
+    root.style.setProperty('--primary-hue', hue)
+    root.style.setProperty('--primary-saturation', `${saturation}%`)
+    root.style.setProperty('--primary-lightness', `${lightness}%`)
 
     // Calcula cores derivadas
-    const primaryColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-    const primaryLight = `hsl(${hue}, ${saturation}%, ${lightness + 15}%)`;
-    const primaryDark = `hsl(${hue}, ${saturation}%, ${lightness - 15}%)`;
+    const primaryColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    const primaryLight = `hsl(${hue}, ${saturation}%, ${lightness + 15}%)`
+    const primaryDark = `hsl(${hue}, ${saturation}%, ${lightness - 15}%)`
 
     // Aplica cores derivadas
-    root.style.setProperty('--primary-color-dynamic', primaryColor);
-    root.style.setProperty('--primary-color-light', primaryLight);
-    root.style.setProperty('--primary-color-dark', primaryDark);
-    root.style.setProperty('--primary-gradient', `linear-gradient(135deg, ${primaryColor} 0%, ${primaryLight} 100%)`);
+    root.style.setProperty('--primary-color-dynamic', primaryColor)
+    root.style.setProperty('--primary-color-light', primaryLight)
+    root.style.setProperty('--primary-color-dark', primaryDark)
+    root.style.setProperty('--primary-gradient', `linear-gradient(135deg, ${primaryColor} 0%, ${primaryLight} 100%)`)
 
-    // Atualiza a cor do PWA
-    updatePWAThemeColor(hue, saturation, lightness);
+    // Sincroniza a barra de status com a navbar
+    syncStatusBarWithNavbar(hue, saturation, lightness)
 
     // Aplica gradiente permanente apenas se for modo escuro
     if (body.classList.contains('dark')) {
       body.style.background = `linear-gradient(135deg, 
-      hsl(${hue}, ${Math.max(saturation * 0.4, 20)}%, 8%) 0%,
-      hsl(${hue}, ${Math.max(saturation * 0.3, 15)}%, 12%) 50%,
-      hsl(${hue}, ${Math.max(saturation * 0.2, 10)}%, 16%) 100%
-    )`;
+      hsl(${hue}, ${Math.max(saturation * 0.2, 10)}%, 6%) 0%,
+      hsl(${hue}, ${Math.max(saturation * 0.15, 8)}%, 10%) 50%,
+      hsl(${hue}, ${Math.max(saturation * 0.1, 5)}%, 14%) 100%
+    )`
     }
   }
 
@@ -186,8 +242,8 @@ export function useColorSettings() {
     resetToDefault,
     isInitialized,
     removePreview,
-    hasChanges, // Exporta o estado
-    setHasChanges, // Exporta a função para modificar o estado
+    hasChanges,
+    setHasChanges,
     forceColorUpdate,
     updatePWAThemeColor
   }

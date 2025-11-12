@@ -3,8 +3,10 @@ import { ThemeProvider } from '../contexts/ThemeContext'
 import { AuthProvider } from '../contexts/AuthContext'
 import { useEffect } from 'react'
 import InstallPrompt from '../components/PWA/InstallPrompt' // Novo componente
+import { usePWATheme } from '../hooks/usePWATheme'
 
 function ThemeInitializer() {
+  usePWATheme()
   useEffect(() => {
     // Aplicar tema salvo
     const savedTheme = localStorage.getItem('theme') || 'dark'

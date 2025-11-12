@@ -2,16 +2,14 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js",
   "/login": "pages/login.js",
-  "/cakes/frostings": "pages/cakes/frostings.js",
   "/api/masses": "pages/api/masses.js",
   "/api/products": "pages/api/products.js",
-  "/api/auth/login": "pages/api/auth/login.js",
-  "/api/candies": "pages/api/candies.js",
+  "/": "pages/index.js",
   "/api/supplies": "pages/api/supplies.js",
   "/api/cake-masses": "pages/api/cake-masses.js",
+  "/api/cake-frostings": "pages/api/cake-frostings.js",
+  "/api/candies": "pages/api/candies.js",
   "/api/cakes": "pages/api/cakes.js",
-  "/api/orders": "pages/api/orders.js",
-  "/api/cake-frostings": "pages/api/cake-frostings.js"
+  "/api/orders": "pages/api/orders.js"
 }
