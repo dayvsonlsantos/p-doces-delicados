@@ -1,3 +1,4 @@
+// components/Cakes/CakeBatchCalculator.js (corrigido)
 import GlassCard from '../UI/GlassCard'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect, useRef } from 'react'
@@ -28,6 +29,64 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       ...prev,
       [cakeId]: Math.max(0, quantity)
     }))
+  }
+
+  // Função para calcular custo da massa/cobertura
+  const calculateMassCost = (mass) => {
+    let totalCost = 0
+    mass.ingredients?.forEach(ingredient => {
+      const product = products.find(p => p._id === ingredient.productId)
+      if (product && ingredient.grams) {
+        const ingredientGrams = parseFloat(ingredient.grams)
+        let cost = 0
+
+        if (product.unit === 'un') {
+          const unitWeight = 50 // padrão 50g por unidade
+          const units = ingredientGrams / unitWeight
+          cost = units * product.unitCost
+        } else {
+          cost = ingredientGrams * product.baseUnitCost
+        }
+
+        totalCost += cost
+      }
+    })
+    return totalCost
+  }
+
+  // Função para calcular custo de um bolo individual
+  const calculateCakeCost = (cake) => {
+    let totalCost = 0
+
+    // Cálculo das massas
+    if (cake.masses) {
+      cake.masses.forEach(massItem => {
+        const mass = cakeMasses.find(m => m.name === massItem.massName)
+        if (mass && massItem.grams) {
+          const massTotalCost = mass.cost || calculateMassCost(mass)
+          const massCostPerGram = massTotalCost / mass.totalGrams
+          const massGrams = parseFloat(massItem.grams)
+          const massCost = massCostPerGram * massGrams
+          totalCost += massCost
+        }
+      })
+    }
+
+    // Cálculo das coberturas
+    if (cake.frostings) {
+      cake.frostings.forEach(frostingItem => {
+        const frosting = cakeFrostings.find(f => f.name === frostingItem.frostingName)
+        if (frosting && frostingItem.grams) {
+          const frostingTotalCost = frosting.cost || calculateMassCost(frosting)
+          const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
+          const frostingGrams = parseFloat(frostingItem.grams)
+          const frostingCost = frostingCostPerGram * frostingGrams
+          totalCost += frostingCost
+        }
+      })
+    }
+
+    return totalCost
   }
 
   // Função para calcular ingredientes totais de uma massa
@@ -85,20 +144,27 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       if (quantity > 0) {
         const cake = cakes.find(c => c._id === cakeId)
         if (cake) {
-          const cakeCost = cake.costPerUnit || 0
-          const cakeRevenue = cake.salePrice ? parseFloat(cake.salePrice) * quantity : 0
-          const cakeProfit = cakeRevenue - (cakeCost * quantity)
+          // CORREÇÃO: Calcular custo unitário corretamente
+          const cakeUnitCost = calculateCakeCost(cake) || 0
+          const cakeTotalCost = cakeUnitCost * quantity
+          
+          // Usar preço de venda definido ou calcular sugestão (3x o custo)
+          const cakeSalePrice = cake.salePrice || (cakeUnitCost * 3)
+          const cakeRevenue = cakeSalePrice * quantity
+          const cakeProfit = cakeRevenue - cakeTotalCost
 
-          // Detalhes do bolo
+          // CORREÇÃO: Garantir que todos os valores sejam números válidos
           cakeDetails.push({
             cake,
             quantity,
-            totalCost: cakeCost * quantity,
-            totalRevenue: cakeRevenue,
-            totalProfit: cakeProfit
+            unitCost: cakeUnitCost,
+            totalCost: cakeTotalCost,
+            salePrice: cakeSalePrice,
+            revenue: cakeRevenue,
+            profit: cakeProfit
           })
 
-          totalCost += cakeCost * quantity
+          totalCost += cakeTotalCost
           totalRevenue += cakeRevenue
           totalProfit += cakeProfit
 
@@ -116,7 +182,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                     }
                   }
 
-                  const massGrams = massItem.grams * quantity
+                  const massGrams = (massItem.grams || 0) * quantity
                   massGroups[massItem.massName].totalGrams += massGrams
                   massGroups[massItem.massName].cakes.push({
                     cake: cake,
@@ -142,7 +208,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                     }
                   }
 
-                  const frostingGrams = frostingItem.grams * quantity
+                  const frostingGrams = (frostingItem.grams || 0) * quantity
                   frostingGroups[frostingItem.frostingName].totalGrams += frostingGrams
                   frostingGroups[frostingItem.frostingName].cakes.push({
                     cake: cake,
@@ -157,13 +223,14 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       }
     })
 
+    // CORREÇÃO: Garantir que os totais sejam números válidos
     setCalculations({
       cakeDetails,
       massGroups,
       frostingGroups,
-      totalCost: totalCost.toFixed(2),
-      totalRevenue: totalRevenue.toFixed(2),
-      totalProfit: totalProfit.toFixed(2)
+      totalCost: (totalCost || 0).toFixed(2),
+      totalRevenue: (totalRevenue || 0).toFixed(2),
+      totalProfit: (totalProfit || 0).toFixed(2)
     })
   }
 
@@ -243,15 +310,15 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
               <div className="flex-1">
                 <span className="text-white font-medium text-sm">{item.cake.name}</span>
                 <div className="text-white/60 text-xs">
-                  {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                  {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • R$ {(item.totalCost || 0).toFixed(2)} total
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-green-400 font-semibold text-sm">
-                  R$ {item.totalRevenue.toFixed(2)}
+                  R$ {(item.revenue || 0).toFixed(2)}
                 </div>
                 <div className="text-green-300 text-xs">
-                  Lucro: R$ {item.totalProfit.toFixed(2)}
+                  Lucro: R$ {(item.profit || 0).toFixed(2)}
                 </div>
               </div>
             </div>
@@ -274,7 +341,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                 <div key={massName} className="p-3 rounded-lg bg-white/5">
                   <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
                   <p className="text-white/60 text-xs mb-2">
-                    Total necessário: <strong>{massData.totalGrams.toFixed(2)}g</strong>
+                    Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
                   </p>
                   
                   <p className="text-white/60 text-xs mb-1">Bolos que usam esta massa:</p>
@@ -283,7 +350,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                       <div key={idx} className="flex justify-between text-xs text-white/60">
                         <span>{cakeItem.cake.name}</span>
                         <span>
-                          {cakeItem.quantity} un • {cakeItem.grams.toFixed(2)}g
+                          {cakeItem.quantity} un • {(cakeItem.grams || 0).toFixed(2)}g
                         </span>
                       </div>
                     ))}
@@ -297,7 +364,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {data.grams.toFixed(2)}g
+                              {(data.grams || 0).toFixed(2)}g
                             </span>
                           </div>
                         ))}
@@ -330,7 +397,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                 <div key={frostingName} className="p-3 rounded-lg bg-white/5">
                   <h5 className="font-bold text-white text-sm mb-2">{frostingName}</h5>
                   <p className="text-white/60 text-xs mb-2">
-                    Total necessário: <strong>{frostingData.totalGrams.toFixed(2)}g</strong>
+                    Total necessário: <strong>{(frostingData.totalGrams || 0).toFixed(2)}g</strong>
                   </p>
                   
                   <p className="text-white/60 text-xs mb-1">Bolos que usam esta cobertura:</p>
@@ -339,7 +406,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                       <div key={idx} className="flex justify-between text-xs text-white/60">
                         <span>{cakeItem.cake.name}</span>
                         <span>
-                          {cakeItem.quantity} un • {cakeItem.grams.toFixed(2)}g
+                          {cakeItem.quantity} un • {(cakeItem.grams || 0).toFixed(2)}g
                         </span>
                       </div>
                     ))}
@@ -353,7 +420,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {data.grams.toFixed(2)}g
+                              {(data.grams || 0).toFixed(2)}g
                             </span>
                           </div>
                         ))}
@@ -391,45 +458,51 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         </h2>
 
         <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-          {cakes.map(cake => (
-            <div key={cake._id} className="flex items-center flex-col md:flex-row justify-between p-4 rounded-2xl bg-white/5">
-              <div className="flex-1">
-                <h3 className="font-semibold text-primary">{cake.name}</h3>
-                <p className="text-secondary text-sm">
-                  {cake.masses?.length || 0} massa(s) • {cake.frostings?.length || 0} cobertura(s)
-                </p>
-                {cake.salePrice && (
-                  <p className="text-green-500 text-sm font-semibold">
-                    Venda: R$ {parseFloat(cake.salePrice).toFixed(2)}
+          {cakes.map(cake => {
+            const cakeCost = calculateCakeCost(cake) || 0
+            const cakeSalePrice = cake.salePrice || (cakeCost * 3)
+            
+            return (
+              <div key={cake._id} className="flex items-center flex-col md:flex-row justify-between p-4 rounded-2xl bg-white/5">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-primary">{cake.name}</h3>
+                  <p className="text-secondary text-sm">
+                    {cake.masses?.length || 0} massa(s) • {cake.frostings?.length || 0} cobertura(s)
                   </p>
-                )}
+                  <div className="text-xs space-y-1 mt-1">
+                    <p className="text-orange-400">Custo: R$ {cakeCost.toFixed(2)}</p>
+                    <p className="text-green-500 font-semibold">
+                      Venda: R$ {cakeSalePrice.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2 md:mt-0 flex items-center gap-2">
+                  <button
+                    onClick={() => updateQuantity(cake._id, (selectedCakes[cake._id] || 0) - 1)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
+                  >
+                    <FaMinus size={12} />
+                  </button>
+
+                  <input
+                    type="number"
+                    value={selectedCakes[cake._id] || 0}
+                    onChange={(e) => updateQuantity(cake._id, parseInt(e.target.value) || 0)}
+                    className="w-16 text-center glass-input"
+                    min="0"
+                  />
+
+                  <button
+                    onClick={() => updateQuantity(cake._id, (selectedCakes[cake._id] || 0) + 1)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/20 text-green-500 hover:bg-green-500/30 transition-colors"
+                  >
+                    <FaPlus size={12} />
+                  </button>
+                </div>
               </div>
-
-              <div className="mt-2 md:mt-0 flex items-center gap-2">
-                <button
-                  onClick={() => updateQuantity(cake._id, (selectedCakes[cake._id] || 0) - 1)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
-                >
-                  <FaMinus size={12} />
-                </button>
-
-                <input
-                  type="number"
-                  value={selectedCakes[cake._id] || 0}
-                  onChange={(e) => updateQuantity(cake._id, parseInt(e.target.value) || 0)}
-                  className="w-16 text-center glass-input"
-                  min="0"
-                />
-
-                <button
-                  onClick={() => updateQuantity(cake._id, (selectedCakes[cake._id] || 0) + 1)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/20 text-green-500 hover:bg-green-500/30 transition-colors"
-                >
-                  <FaPlus size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <GlassButton
@@ -506,15 +579,15 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                     <div>
                       <span className="text-primary font-semibold">{item.cake.name}</span>
                       <div className="text-secondary text-xs">
-                        {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                        {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • R$ {(item.totalCost || 0).toFixed(2)} total
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-green-400 font-semibold">
-                        R$ {item.totalRevenue.toFixed(2)}
+                        R$ {(item.revenue || 0).toFixed(2)}
                       </div>
                       <div className="text-green-300 text-xs">
-                        Lucro: R$ {item.totalProfit.toFixed(2)}
+                        Lucro: R$ {(item.profit || 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -545,7 +618,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
                       <div className="mb-3">
                         <p className="text-secondary text-sm mb-2">
-                          Total necessário: <strong>{massData.totalGrams.toFixed(2)}g</strong>
+                          Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
                         </p>
                         <p className="text-secondary text-xs">Bolos que usam esta massa:</p>
                         <div className="space-y-1 mt-1">
@@ -553,7 +626,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                             <div key={idx} className="flex justify-between text-xs text-white/60">
                               <span>{cakeItem.cake.name}</span>
                               <span>
-                                {cakeItem.quantity} un • {cakeItem.grams.toFixed(2)}g
+                                {cakeItem.quantity} un • {(cakeItem.grams || 0).toFixed(2)}g
                               </span>
                             </div>
                           ))}
@@ -568,7 +641,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                               <div key={productName} className="flex justify-between text-sm">
                                 <span className="text-white">{productName}</span>
                                 <span className="text-primary-300 font-semibold">
-                                  {data.grams.toFixed(2)}g
+                                  {(data.grams || 0).toFixed(2)}g
                                 </span>
                               </div>
                             ))}
@@ -608,7 +681,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
                       <div className="mb-3">
                         <p className="text-secondary text-sm mb-2">
-                          Total necessário: <strong>{frostingData.totalGrams.toFixed(2)}g</strong>
+                          Total necessário: <strong>{(frostingData.totalGrams || 0).toFixed(2)}g</strong>
                         </p>
                         <p className="text-secondary text-xs">Bolos que usam esta cobertura:</p>
                         <div className="space-y-1 mt-1">
@@ -616,7 +689,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                             <div key={idx} className="flex justify-between text-xs text-white/60">
                               <span>{cakeItem.cake.name}</span>
                               <span>
-                                {cakeItem.quantity} un • {cakeItem.grams.toFixed(2)}g
+                                {cakeItem.quantity} un • {(cakeItem.grams || 0).toFixed(2)}g
                               </span>
                             </div>
                           ))}
@@ -631,7 +704,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                               <div key={productName} className="flex justify-between text-sm">
                                 <span className="text-white">{productName}</span>
                                 <span className="text-primary-300 font-semibold">
-                                  {data.grams.toFixed(2)}g
+                                  {(data.grams || 0).toFixed(2)}g
                                 </span>
                               </div>
                             ))}

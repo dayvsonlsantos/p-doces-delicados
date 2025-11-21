@@ -38,6 +38,40 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
     })
   }
 
+  // Função para obter descrição amigável da unidade
+  const getUnitDescription = (unit) => {
+    if (!unit) return 'gramas'
+
+    const unitMap = {
+      'un': 'unidades',
+      'kg': 'quilogramas',
+      'g': 'gramas',
+      'l': 'litros',
+      'ml': 'mililitros',
+      'cx': 'caixas',
+      'pacote': 'pacotes'
+    }
+
+    return unitMap[unit.toLowerCase()] || unit
+  }
+
+  // Função para obter placeholder baseado na unidade
+  const getQuantityPlaceholder = (unit) => {
+    if (!unit) return "0.00"
+
+    const placeholderMap = {
+      'un': "Ex: 2",
+      'kg': "Ex: 0.5",
+      'g': "Ex: 250",
+      'l': "Ex: 1",
+      'ml': "Ex: 500",
+      'cx': "Ex: 1",
+      'pacote': "Ex: 1"
+    }
+
+    return placeholderMap[unit.toLowerCase()] || "0.00"
+  }
+
   const removeIngredient = (index) => {
     const newIngredients = formData.ingredients.filter((_, i) => i !== index)
     setFormData({ ...formData, ingredients: newIngredients })
@@ -45,8 +79,55 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
 
   const updateIngredient = (index, field, value) => {
     const newIngredients = [...formData.ingredients]
-    newIngredients[index][field] = value
+
+    if (field === 'productId') {
+      const product = products.find(p => p._id === value)
+      const unit = product?.unit || ''
+
+      newIngredients[index] = {
+        ...newIngredients[index],
+        productId: value,
+        productUnit: unit,
+        // Limpa os campos quando muda o produto
+        grams: '',
+        quantityInput: ''
+      }
+    } else if (field === 'quantityInput') {
+      const product = products.find(p => p._id === newIngredients[index].productId)
+      const unit = product?.unit || ''
+
+      // Converte para gramas baseado na unidade
+      const grams = convertToGrams(value, unit)
+
+      newIngredients[index] = {
+        ...newIngredients[index],
+        quantityInput: value,
+        grams: grams
+      }
+    } else {
+      newIngredients[index][field] = value
+    }
+
     setFormData({ ...formData, ingredients: newIngredients })
+  }
+
+  // Função de conversão
+  const convertToGrams = (value, unit) => {
+    if (!value || !unit) return 0
+
+    const quantity = parseFloat(value) || 0
+    const conversions = {
+      'un': 50,      // 1 unidade = 50g
+      'kg': 1000,    // 1 kg = 1000g
+      'g': 1,        // 1 g = 1g
+      'l': 1000,     // 1 litro = 1000g
+      'ml': 1,       // 1 ml = 1g
+      'cx': 1000,    // 1 caixa = 1000g
+      'pacote': 1000 // 1 pacote = 1000g
+    }
+
+    const conversionRate = conversions[unit.toLowerCase()] || 1
+    return quantity * conversionRate
   }
 
   const calculateGramsPerCake = () => {
@@ -231,7 +312,7 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
                         onChange={(e) => updateIngredient(index, 'productId', e.target.value)}
                         className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                         required
-                        style={{ 
+                        style={{
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                           backgroundRepeat: 'no-repeat',
@@ -249,17 +330,30 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
                     </div>
 
                     <div>
-                      <label className="block text-white/60 text-xs mb-2">Quantidade (gramas)</label>
+                      <label className="block text-white/60 text-xs mb-2">
+                        Quantidade {' '}
+                        {ingredient.productUnit && (
+                          <span className="text-primary-300">
+                            ({getUnitDescription(ingredient.productUnit)})
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="0.00"
-                        value={ingredient.grams}
-                        onChange={(e) => updateIngredient(index, 'grams', e.target.value)}
+                        placeholder={getQuantityPlaceholder(ingredient.productUnit)}
+                        value={ingredient.quantityInput || ''}
+                        onChange={(e) => updateIngredient(index, 'quantityInput', e.target.value)}
                         className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                         required
+                        disabled={!ingredient.productId}
                       />
+                      {ingredient.grams > 0 && (
+                        <div className="text-xs text-green-400 mt-1">
+                          💡 Equivale a {ingredient.grams.toFixed(2)}g
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -420,7 +420,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full h-12 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
+                className="w-full h-12 text-center bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
                 ref={startDateRef}
               />
               <button
@@ -441,7 +441,7 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full h-12 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
+                className="w-full text-center h-12 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0"
                 ref={endDateRef}
               />
               <button

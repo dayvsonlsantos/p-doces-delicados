@@ -96,6 +96,24 @@ export default function CakeMasses() {
     }
   }
 
+  // Função para obter descrição amigável da unidade
+  const getUnitDescription = (unit) => {
+    if (!unit) return ''
+    
+    const unitMap = {
+      'un': 'unidades',
+      'kg': 'kg',
+      'g': 'g',
+      'l': 'litros',
+      'ml': 'ml',
+      'cx': 'caixas',
+      'pacote': 'pacotes'
+    }
+    
+    return unitMap[unit.toLowerCase()] || unit
+  }
+
+  // Na função calculateMassCost, atualize para:
   const calculateMassCost = (mass) => {
     let totalCost = 0
     mass.ingredients?.forEach(ingredient => {
@@ -104,9 +122,14 @@ export default function CakeMasses() {
         const ingredientGrams = parseFloat(ingredient.grams)
         let cost = 0
 
+        // Se o produto é por unidade, usa unitCost
         if (product.unit === 'un') {
-          cost = product.unitCost
+          // Para unidades, calcula quantas unidades são necessárias
+          const unitWeight = getUnitConversion(product.unit, '1') // Peso padrão por unidade
+          const units = ingredientGrams / unitWeight
+          cost = units * product.unitCost
         } else {
+          // Para outros, usa baseUnitCost (custo por grama)
           cost = ingredientGrams * product.baseUnitCost
         }
 
@@ -116,9 +139,74 @@ export default function CakeMasses() {
     return totalCost
   }
 
+  // Adicione esta função helper no mesmo arquivo:
+  const getUnitConversion = (productUnit, inputValue) => {
+    if (!productUnit) return 1
+
+    const unit = productUnit.toLowerCase()
+
+    if (unit === 'un') {
+      return 50 // padrão 50g por unidade
+    }
+
+    const conversions = {
+      'kg': 1000,
+      'g': 1,
+      'l': 1000,
+      'ml': 1
+    }
+
+    return conversions[unit] || 1
+  }
+
   const getProductName = (productId) => {
     const product = products.find(p => p._id === productId)
     return product ? product.name : 'Produto não encontrado'
+  }
+
+  // Função para formatar a exibição do ingrediente na unidade original
+  const getIngredientDisplay = (ingredient) => {
+    const product = products.find(p => p._id === ingredient.productId)
+    if (!product) return 'Produto não encontrado'
+
+    // Se tem quantityInput (nova versão), mostra na unidade original
+    if (ingredient.quantityInput && ingredient.productUnit) {
+      const unitDescription = getUnitDescription(ingredient.productUnit)
+      return `${ingredient.quantityInput} ${unitDescription}`
+    } 
+    // Se é versão antiga (apenas grams), converte para a unidade do produto
+    else if (ingredient.grams && product.unit) {
+      const quantity = convertGramsToOriginalUnit(ingredient.grams, product.unit)
+      const unitDescription = getUnitDescription(product.unit)
+      return `${quantity} ${unitDescription}`
+    }
+    
+    return 'Quantidade não definida'
+  }
+
+  // Função para converter gramas de volta para a unidade original
+  const convertGramsToOriginalUnit = (grams, unit) => {
+    const gramsValue = parseFloat(grams) || 0
+    const conversions = {
+      'un': 50,      // 1 unidade = 50g
+      'kg': 1000,    // 1 kg = 1000g
+      'g': 1,        // 1 g = 1g
+      'l': 1000,     // 1 litro = 1000g
+      'ml': 1,       // 1 ml = 1g
+      'cx': 1000,    // 1 caixa = 1000g
+      'pacote': 1000 // 1 pacote = 1000g
+    }
+    
+    const conversionRate = conversions[unit.toLowerCase()] || 1
+    const result = gramsValue / conversionRate
+    
+    // Formata para ter no máximo 2 casas decimais
+    return result % 1 === 0 ? result.toString() : result.toFixed(2)
+  }
+
+  // Função para obter o produto de um ingrediente
+  const getIngredientProduct = (ingredient) => {
+    return products.find(p => p._id === ingredient.productId)
   }
 
   return (
@@ -226,18 +314,28 @@ export default function CakeMasses() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-4">
-                    {mass.ingredients?.map((ingredient, index) => (
-                      <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                        <div className="min-w-0">
-                          <span className="text-white font-medium text-sm md:text-base truncate">
-                            {getProductName(ingredient.productId)}
-                          </span>
-                          <div className="text-white/60 text-xs">
-                            {ingredient.grams}g
+                    {mass.ingredients?.map((ingredient, index) => {
+                      const product = getIngredientProduct(ingredient)
+                      const displayText = getIngredientDisplay(ingredient)
+                      
+                      return (
+                        <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-white font-medium text-sm md:text-base truncate block">
+                              {getProductName(ingredient.productId)}
+                            </span>
+                            <div className="text-white/60 text-sm mt-1 font-semibold">
+                              {displayText}
+                            </div>
+                            {product && (
+                              <div className="text-white/40 text-xs mt-1">
+                                {product.unit.toUpperCase()}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )

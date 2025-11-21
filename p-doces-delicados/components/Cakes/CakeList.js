@@ -1,4 +1,4 @@
-// components/Cakes/CakeList.js (responsivo)
+// components/Cakes/CakeList.js (atualizado com 2 casas decimais)
 import GlassButton from '../UI/GlassButton'
 import { FaEdit, FaTrash, FaBirthdayCake } from 'react-icons/fa'
 import { useState, useEffect } from 'react'
@@ -20,39 +20,91 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
     }
   }
 
+  // CORREÇÃO: Usar a mesma lógica de cálculo que está na página de massas
+  const calculateMassCost = (mass) => {
+    let totalCost = 0
+    mass.ingredients?.forEach(ingredient => {
+      const product = products.find(p => p._id === ingredient.productId)
+      if (product && ingredient.grams) {
+        const ingredientGrams = parseFloat(ingredient.grams)
+        let cost = 0
+
+        // CORREÇÃO: Usar a mesma lógica
+        if (product.unit === 'un') {
+          const unitWeight = 50 // padrão 50g por unidade
+          const units = ingredientGrams / unitWeight
+          cost = units * product.unitCost
+        } else {
+          cost = ingredientGrams * product.baseUnitCost
+        }
+
+        totalCost += cost
+      }
+    })
+    return totalCost
+  }
+
   const calculateCakeCost = (cake) => {
     let totalCost = 0
     const costBreakdown = {
       massCost: 0,
       frostingCost: 0,
       suppliesCost: 0,
-      totalCost: 0
+      totalCost: 0,
+      massDetails: [],
+      frostingDetails: []
     }
 
+    // Cálculo das massas - CORREÇÃO: Buscar o custo calculado da massa
     if (cake.masses) {
       cake.masses.forEach(massItem => {
         const mass = cakeMasses.find(m => m.name === massItem.massName)
         if (mass && massItem.grams) {
-          const massCostPerGram = (mass.cost || 0) / mass.totalGrams
-          const massCost = massCostPerGram * parseFloat(massItem.grams)
+          // CORREÇÃO: Buscar o custo total da massa ou calcular na hora
+          const massTotalCost = mass.cost || calculateMassCost(mass)
+          const massCostPerGram = massTotalCost / mass.totalGrams
+          const massGrams = parseFloat(massItem.grams)
+          const massCost = massCostPerGram * massGrams
+          
           costBreakdown.massCost += massCost
           totalCost += massCost
+          costBreakdown.massDetails.push({
+            massName: massItem.massName,
+            grams: massGrams,
+            cost: massCost,
+            costPerGram: massCostPerGram,
+            massTotalCost: massTotalCost,
+            massTotalGrams: mass.totalGrams
+          })
         }
       })
     }
 
+    // Cálculo das coberturas - CORREÇÃO: Mesma lógica para coberturas
     if (cake.frostings) {
       cake.frostings.forEach(frostingItem => {
         const frosting = cakeFrostings.find(f => f.name === frostingItem.frostingName)
         if (frosting && frostingItem.grams) {
-          const frostingCostPerGram = (frosting.cost || 0) / frosting.totalGrams
-          const frostingCost = frostingCostPerGram * parseFloat(frostingItem.grams)
+          const frostingTotalCost = frosting.cost || calculateMassCost(frosting)
+          const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
+          const frostingGrams = parseFloat(frostingItem.grams)
+          const frostingCost = frostingCostPerGram * frostingGrams
+          
           costBreakdown.frostingCost += frostingCost
           totalCost += frostingCost
+          costBreakdown.frostingDetails.push({
+            frostingName: frostingItem.frostingName,
+            grams: frostingGrams,
+            cost: frostingCost,
+            costPerGram: frostingCostPerGram,
+            frostingTotalCost: frostingTotalCost,
+            frostingTotalGrams: frosting.totalGrams
+          })
         }
       })
     }
 
+    // Cálculo dos insumos
     if (cake.supplies) {
       cake.supplies.forEach(supplyId => {
         const supply = suppliesList.find(s => s._id === supplyId)
@@ -102,46 +154,54 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
         const costBreakdown = calculateCakeCost(cake)
         const suggestedPrice = calculateSuggestedPrice(costBreakdown.totalCost)
         const hasSalePrice = cake.salePrice && parseFloat(cake.salePrice) > 0
+        const totalGrams = (costBreakdown.massDetails.reduce((sum, m) => sum + m.grams, 0) + 
+                          costBreakdown.frostingDetails.reduce((sum, f) => sum + f.grams, 0))
 
         return (
-          <div key={cake._id} className="p-4 md:p-6 rounded-xl md:rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
-            {/* Header - Layout responsivo */}
-            <div className="flex items-start justify-between flex-col md:flex-row gap-3 md:gap-4">
+          <div key={cake._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
+            <div className="flex items-start justify-between mb-4 flex-col md:flex-row gap-4">
               <div className="flex items-start gap-3 md:gap-4 flex-1 w-full">
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white flex-shrink-0">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white flex-shrink-0">
                   <FaBirthdayCake className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between flex-col md:flex-row gap-3 md:gap-0">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white text-base md:text-lg mb-1 md:mb-2 truncate">{cake.name}</h3>
+                      <h3 className="font-semibold text-white text-base md:text-lg mb-2 truncate">
+                        {cake.name}
+                      </h3>
+                      
                       {cake.description && (
-                        <p className="text-white/60 text-xs md:text-sm mb-2 md:mb-3 line-clamp-2">{cake.description}</p>
+                        <p className="text-white/60 text-xs md:text-sm mb-3 line-clamp-2">{cake.description}</p>
                       )}
                       
-                      {/* Massas e Coberturas */}
-                      <div className="space-y-2 mb-3">
-                        {cake.masses && cake.masses.length > 0 && (
-                          <div>
-                            <p className="text-white/60 text-xs md:text-sm mb-1">Massas:</p>
+                      {/* Informações das Massas e Coberturas */}
+                      <div className="mb-3">
+                        <p className="text-white/60 text-xs md:text-sm mb-2">
+                          {costBreakdown.massDetails.length} massa(s) • {costBreakdown.frostingDetails.length} cobertura(s) • {totalGrams.toFixed(2)}g total
+                        </p>
+                        
+                        {/* Massas */}
+                        {costBreakdown.massDetails.length > 0 && (
+                          <div className="mb-2">
                             <div className="flex flex-wrap gap-1 md:gap-2">
-                              {cake.masses.map((massItem, index) => (
+                              {costBreakdown.massDetails.map((massDetail, index) => (
                                 <span key={index} className="px-2 py-1 bg-blue-500/20 rounded-full text-xs text-blue-300">
-                                  {getMassName(massItem.massName)} ({massItem.grams}g)
+                                  {getMassName(massDetail.massName)} ({massDetail.grams.toFixed(2)}g)
                                 </span>
                               ))}
                             </div>
                           </div>
                         )}
 
-                        {cake.frostings && cake.frostings.length > 0 && (
+                        {/* Coberturas */}
+                        {costBreakdown.frostingDetails.length > 0 && (
                           <div>
-                            <p className="text-white/60 text-xs md:text-sm mb-1">Coberturas:</p>
                             <div className="flex flex-wrap gap-1 md:gap-2">
-                              {cake.frostings.map((frostingItem, index) => (
+                              {costBreakdown.frostingDetails.map((frostingDetail, index) => (
                                 <span key={index} className="px-2 py-1 bg-pink-500/20 rounded-full text-xs text-pink-300">
-                                  {getFrostingName(frostingItem.frostingName)} ({frostingItem.grams}g)
+                                  {getFrostingName(frostingDetail.frostingName)} ({frostingDetail.grams.toFixed(2)}g)
                                 </span>
                               ))}
                             </div>
@@ -149,8 +209,9 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                         )}
                       </div>
 
-                      {/* Custo Detalhado */}
+                      {/* Custo Detalhado - ARREDONDADO PARA 2 CASAS DECIMAIS */}
                       <div className="space-y-1 text-xs md:text-sm">
+                        {/* Massas */}
                         {costBreakdown.massCost > 0 && (
                           <div className="flex justify-between">
                             <span className="text-white/70">Custo massas:</span>
@@ -158,6 +219,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                           </div>
                         )}
                         
+                        {/* Coberturas */}
                         {costBreakdown.frostingCost > 0 && (
                           <div className="flex justify-between">
                             <span className="text-white/70">Custo coberturas:</span>
@@ -165,6 +227,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                           </div>
                         )}
                         
+                        {/* Insumos */}
                         {costBreakdown.suppliesCost > 0 && (
                           <div className="flex justify-between">
                             <span className="text-white/70">Custo insumos:</span>
@@ -181,9 +244,9 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                       </div>
                     </div>
                     
-                    {/* Card de Preço - Responsivo */}
-                    <div className="w-full md:w-auto mt-3 md:mt-0 md:ml-4">
-                      <div className={`border rounded-lg md:rounded-xl p-2 md:p-3 w-full md:min-w-[140px] ${
+                    {/* Card de Preço */}
+                    <div className="text-right w-full md:w-auto">
+                      <div className={`border rounded-xl p-3 min-w-[140px] ${
                         hasSalePrice 
                           ? 'bg-green-500/10 border-green-500/20' 
                           : 'bg-blue-500/10 border-blue-500/20'
@@ -229,7 +292,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                       {!hasSalePrice && (
                         <button
                           onClick={() => onEdit(cake)}
-                          className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline transition-colors w-full md:w-auto text-center md:text-right block"
+                          className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline transition-colors"
                         >
                           Definir preço
                         </button>
@@ -239,28 +302,81 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                 </div>
               </div>
 
-              {/* Botões de ação - Responsivo */}
-              <div className="flex items-center gap-2 w-full md:w-auto justify-end md:justify-start mt-3 md:mt-0 md:ml-4">
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                 <GlassButton
                   variant="secondary"
                   onClick={() => onEdit(cake)}
-                  className="px-3 py-2 text-xs md:text-sm flex-1 md:flex-none"
+                  className="px-3 py-2 text-xs md:text-sm"
                 >
-                  <FaEdit className="w-3 h-3" />
+                  <FaEdit className="w-3 h-3 md:w-3 md:h-3" />
                 </GlassButton>
                 <GlassButton
                   variant="danger"
                   onClick={() => onDelete(cake._id)}
-                  className="px-3 py-2 text-xs md:text-sm flex-1 md:flex-none"
+                  className="px-3 py-2 text-xs md:text-sm"
                 >
-                  <FaTrash className="w-3 h-3" />
+                  <FaTrash className="w-3 h-3 md:w-3 md:h-3" />
                 </GlassButton>
               </div>
             </div>
 
+            {/* Detalhes das Massas Individualmente - ARREDONDADO PARA 2 CASAS DECIMAIS */}
+            {costBreakdown.massDetails.length > 0 && (
+              <div className="mt-3 md:mt-4">
+                <h4 className="text-white/80 text-sm font-medium mb-2">Detalhes das Massas:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+                  {costBreakdown.massDetails.map((massDetail, index) => (
+                    <div key={index} className="flex justify-between items-center p-2 md:p-3 rounded-xl bg-white/5">
+                      <div className="min-w-0">
+                        <span className="text-white text-xs md:text-sm font-medium truncate">
+                          {massDetail.massName}
+                        </span>
+                        <div className="text-white/60 text-xs">
+                          {massDetail.grams.toFixed(2)}g • R$ {massDetail.costPerGram.toFixed(4)}/g
+                        </div>
+                        <div className="text-white/40 text-xs">
+                          Custo total da massa: R$ {massDetail.massTotalCost?.toFixed(2)} ({massDetail.massTotalGrams}g)
+                        </div>
+                      </div>
+                      <span className="text-blue-400 text-xs md:text-sm font-semibold">
+                        R$ {massDetail.cost.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Detalhes das Coberturas Individualmente - ARREDONDADO PARA 2 CASAS DECIMAIS */}
+            {costBreakdown.frostingDetails.length > 0 && (
+              <div className="mt-3 md:mt-4">
+                <h4 className="text-white/80 text-sm font-medium mb-2">Detalhes das Coberturas:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+                  {costBreakdown.frostingDetails.map((frostingDetail, index) => (
+                    <div key={index} className="flex justify-between items-center p-2 md:p-3 rounded-xl bg-white/5">
+                      <div className="min-w-0">
+                        <span className="text-white text-xs md:text-sm font-medium truncate">
+                          {frostingDetail.frostingName}
+                        </span>
+                        <div className="text-white/60 text-xs">
+                          {frostingDetail.grams.toFixed(2)}g • R$ {frostingDetail.costPerGram.toFixed(4)}/g
+                        </div>
+                        <div className="text-white/40 text-xs">
+                          Custo total da cobertura: R$ {frostingDetail.frostingTotalCost?.toFixed(2)} ({frostingDetail.frostingTotalGrams}g)
+                        </div>
+                      </div>
+                      <span className="text-pink-400 text-xs md:text-sm font-semibold">
+                        R$ {frostingDetail.cost.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Insumos */}
             {cake.supplies && cake.supplies.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-3 md:mt-4">
                 <h4 className="text-white/80 text-sm font-medium mb-2">Insumos:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {cake.supplies.map((supplyId, index) => (
@@ -268,7 +384,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                       <span className="text-white text-xs md:text-sm truncate">
                         {getSupplyName(supplyId)}
                       </span>
-                      <span className="text-purple-400 text-xs md:text-sm font-semibold flex-shrink-0 ml-2">
+                      <span className="text-purple-400 text-xs md:text-sm font-semibold">
                         1 un
                       </span>
                     </div>

@@ -1,19 +1,11 @@
+// components/Cakes/CakeModal.js (corrigido)
 import Modal from '../UI/Modal'
 import Input from '../UI/Input'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
-import { FaSave, FaTimes, FaPlus, FaTrash, FaCalculator, FaBirthdayCake } from 'react-icons/fa'
+import { FaTrash, FaSave, FaTimes, FaPlus, FaCalculator, FaChartLine } from 'react-icons/fa'
 
-export default function CakeModal({
-  isOpen,
-  onClose,
-  onSave,
-  cake,
-  cakeMasses = [],
-  cakeFrostings = [],
-  products = [],
-  supplies = []
-}) {
+export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, cakeFrostings, products, supplies }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -24,7 +16,29 @@ export default function CakeModal({
     salePrice: ''
   })
 
+  const [suppliesList, setSuppliesList] = useState([])
+  const [loading, setLoading] = useState(false)
   const [profitInputType, setProfitInputType] = useState('percentage')
+
+  // Carregar insumos quando o modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      loadSupplies()
+    }
+  }, [isOpen])
+
+  const loadSupplies = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/supplies')
+      const data = await response.json()
+      setSuppliesList(data)
+    } catch (error) {
+      console.error('Erro ao carregar insumos:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (cake) {
@@ -50,56 +64,107 @@ export default function CakeModal({
     }
   }, [cake, isOpen])
 
-  // Função para calcular custo do bolo
+  // CORREÇÃO: Usar a mesma lógica de cálculo que está na página de massas
+  const calculateMassCost = (mass) => {
+    let totalCost = 0
+    mass.ingredients?.forEach(ingredient => {
+      const product = products.find(p => p._id === ingredient.productId)
+      if (product && ingredient.grams) {
+        const ingredientGrams = parseFloat(ingredient.grams)
+        let cost = 0
+
+        // CORREÇÃO: Usar a mesma lógica
+        if (product.unit === 'un') {
+          const unitWeight = 50 // padrão 50g por unidade
+          const units = ingredientGrams / unitWeight
+          cost = units * product.unitCost
+        } else {
+          cost = ingredientGrams * product.baseUnitCost
+        }
+
+        totalCost += cost
+      }
+    })
+    return totalCost
+  }
+
+  // Função para calcular custo do bolo - CORRIGIDA
   const calculateCakeCost = (cakeData) => {
     let totalCost = 0
     const costBreakdown = {
       massCost: 0,
       frostingCost: 0,
       suppliesCost: 0,
-      totalCost: 0
+      totalCost: 0,
+      totalGrams: 0,
+      massDetails: [],
+      frostingDetails: []
     }
 
-    // Custo das massas
-    if (cakeData.masses) {
-      cakeData.masses.forEach(massItem => {
+    // 1. CUSTO DAS MASSAS - CORREÇÃO: Buscar o custo calculado da massa
+    cakeData.masses.forEach(massItem => {
+      if (massItem.massName && massItem.grams) {
         const mass = cakeMasses.find(m => m.name === massItem.massName)
-        if (mass && massItem.grams) {
-          const massCostPerGram = (mass.cost || 0) / mass.totalGrams
-          const massCost = massCostPerGram * parseFloat(massItem.grams)
-          costBreakdown.massCost += massCost
+        if (mass) {
+          // CORREÇÃO: Buscar o custo total da massa ou calcular na hora
+          const massTotalCost = mass.cost || calculateMassCost(mass)
+          const massCostPerGram = massTotalCost / mass.totalGrams
+          const massGrams = parseFloat(massItem.grams)
+          const massCost = massCostPerGram * massGrams
+
           totalCost += massCost
+          costBreakdown.totalGrams += massGrams
+          costBreakdown.massDetails.push({
+            massName: massItem.massName,
+            grams: massGrams,
+            cost: massCost,
+            costPerGram: massCostPerGram,
+            massTotalCost: massTotalCost,
+            massTotalGrams: mass.totalGrams
+          })
         }
-      })
-    }
+      }
+    })
+    costBreakdown.massCost = costBreakdown.massDetails.reduce((sum, m) => sum + m.cost, 0)
 
-    // Custo das coberturas
-    if (cakeData.frostings) {
-      cakeData.frostings.forEach(frostingItem => {
+    // 2. CUSTO DAS COBERTURAS - CORREÇÃO: Mesma lógica para coberturas
+    cakeData.frostings.forEach(frostingItem => {
+      if (frostingItem.frostingName && frostingItem.grams) {
         const frosting = cakeFrostings.find(f => f.name === frostingItem.frostingName)
-        if (frosting && frostingItem.grams) {
-          const frostingCostPerGram = (frosting.cost || 0) / frosting.totalGrams
-          const frostingCost = frostingCostPerGram * parseFloat(frostingItem.grams)
-          costBreakdown.frostingCost += frostingCost
-          totalCost += frostingCost
-        }
-      })
-    }
+        if (frosting) {
+          const frostingTotalCost = frosting.cost || calculateMassCost(frosting)
+          const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
+          const frostingGrams = parseFloat(frostingItem.grams)
+          const frostingCost = frostingCostPerGram * frostingGrams
 
-    // Custo dos insumos
+          totalCost += frostingCost
+          costBreakdown.totalGrams += frostingGrams
+          costBreakdown.frostingDetails.push({
+            frostingName: frostingItem.frostingName,
+            grams: frostingGrams,
+            cost: frostingCost,
+            costPerGram: frostingCostPerGram,
+            frostingTotalCost: frostingTotalCost,
+            frostingTotalGrams: frosting.totalGrams
+          })
+        }
+      }
+    })
+    costBreakdown.frostingCost = costBreakdown.frostingDetails.reduce((sum, f) => sum + f.cost, 0)
+
+    // 3. CUSTO DOS INSUMOS
     let suppliesCost = 0
     if (cakeData.supplies && cakeData.supplies.length > 0) {
       cakeData.supplies.forEach(supplyId => {
-        const supply = supplies.find(s => s._id === supplyId)
+        const supply = suppliesList.find(s => s._id === supplyId)
         if (supply) {
           suppliesCost += supply.cost
         }
       })
     }
     costBreakdown.suppliesCost = suppliesCost
-    totalCost += suppliesCost
 
-    costBreakdown.totalCost = totalCost
+    costBreakdown.totalCost = totalCost + suppliesCost
     return costBreakdown
   }
 
@@ -133,7 +198,8 @@ export default function CakeModal({
     }
   }, [formData.masses, formData.frostings, formData.supplies, formData.profitMargin, formData.salePrice, profitInputType])
 
-  // Funções para gerenciar massas
+  // ... (restante das funções addMass, removeMass, updateMass, etc. permanecem iguais)
+  // Funções para gerenciar múltiplas massas
   const addMass = () => {
     setFormData({
       ...formData,
@@ -154,7 +220,7 @@ export default function CakeModal({
     setFormData({ ...formData, masses: newMasses })
   }
 
-  // Funções para gerenciar coberturas
+  // Funções para coberturas
   const addFrosting = () => {
     setFormData({
       ...formData,
@@ -208,17 +274,9 @@ export default function CakeModal({
   const handleSubmit = (e) => {
     e.preventDefault()
 
-    // Validar se há pelo menos uma massa e uma cobertura
     const validMasses = formData.masses.filter(mass => mass.massName && mass.grams)
-    const validFrostings = formData.frostings.filter(frosting => frosting.frostingName && frosting.grams)
-
     if (validMasses.length === 0) {
       alert('Por favor, adicione pelo menos uma massa ao bolo')
-      return
-    }
-
-    if (validFrostings.length === 0) {
-      alert('Por favor, adicione pelo menos uma cobertura ao bolo')
       return
     }
 
@@ -230,10 +288,12 @@ export default function CakeModal({
         ...mass,
         grams: parseFloat(mass.grams)
       })),
-      frostings: validFrostings.map(frosting => ({
-        ...frosting,
-        grams: parseFloat(frosting.grams)
-      })),
+      frostings: formData.frostings
+        .filter(frosting => frosting.frostingName && frosting.grams)
+        .map(frosting => ({
+          ...frosting,
+          grams: parseFloat(frosting.grams)
+        })),
       supplies: formData.supplies.filter(supplyId => supplyId)
     }
 
@@ -247,7 +307,7 @@ export default function CakeModal({
       isOpen={isOpen}
       onClose={onClose}
       title={cake ? 'Editar Bolo' : 'Novo Bolo'}
-      size="lg" // Alterado para fullscreen no mobile
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-full">
         {/* Header fixo */}
@@ -259,41 +319,32 @@ export default function CakeModal({
 
         {/* Conteúdo com scroll */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="bg-pink-500/10 border border-pink-500/20 rounded-2xl p-4">
-            <h4 className="text-pink-300 font-semibold mb-2 flex items-center gap-2">
-              <FaBirthdayCake className="w-4 h-4" />
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
+            <h4 className="text-orange-300 font-semibold mb-2 flex items-center gap-2">
+              <FaChartLine className="w-4 h-4" />
               Sobre Bolos
             </h4>
-            <p className="text-pink-200 text-sm">
+            <p className="text-orange-200 text-sm">
               Crie bolos combinando massas, coberturas e insumos. O sistema calcula automaticamente custos e preços.
             </p>
           </div>
 
-          {/* Informações básicas */}
-          <div className="space-y-4">
-            <Input
-              label="Nome do Bolo"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ex: Bolo de Chocolate Premium"
-              required
-            />
+          <Input
+            label="Nome do Bolo"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Ex: Bolo de Chocolate, Bolo de Festa..."
+            required
+          />
 
-            <div>
-              <label className="block text-white/60 text-xs mb-2">
-                Descrição (opcional)
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descrição do bolo, características especiais..."
-                rows="3"
-                className="w-full h-24 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent resize-none"
-              />
-            </div>
-          </div>
+          <Input
+            label="Descrição (opcional)"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="Ex: Bolo de chocolate com recheio de brigadeiro..."
+          />
 
-          {/* Seção de Massas - LAYOUT MOBILE FIRST */}
+          {/* Seção de Massas */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -312,7 +363,6 @@ export default function CakeModal({
             <div className="space-y-3">
               {formData.masses.map((mass, index) => (
                 <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header da massa */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white font-medium text-sm">
                       Massa {index + 1}
@@ -328,7 +378,6 @@ export default function CakeModal({
                     )}
                   </div>
 
-                  {/* Campos da massa */}
                   <div className="space-y-3">
                     <div>
                       <label className="block text-white/60 text-xs mb-2">Massa</label>
@@ -348,7 +397,7 @@ export default function CakeModal({
                         <option value="">Selecione a massa</option>
                         {cakeMasses && cakeMasses.map && cakeMasses.map(massItem => (
                           <option key={massItem.name} value={massItem.name}>
-                            {massItem.name} ({massItem.totalGrams}g total)
+                            {massItem.name} ({massItem.totalGrams}g) - R$ {(massItem.cost || calculateMassCost(massItem)).toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -373,12 +422,12 @@ export default function CakeModal({
             </div>
           </div>
 
-          {/* Seção de Coberturas - LAYOUT MOBILE FIRST */}
+          {/* Seção de Coberturas */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-white font-semibold text-lg">Coberturas do Bolo</h3>
-                <p className="text-white/60 text-sm">Adicione uma ou mais coberturas com suas quantidades</p>
+                <h3 className="text-white font-semibold text-lg">Coberturas (opcional)</h3>
+                <p className="text-white/60 text-sm">Adicione coberturas ao bolo</p>
               </div>
               <button
                 type="button"
@@ -392,7 +441,6 @@ export default function CakeModal({
             <div className="space-y-3">
               {formData.frostings.map((frosting, index) => (
                 <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header da cobertura */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white font-medium text-sm">
                       Cobertura {index + 1}
@@ -408,7 +456,6 @@ export default function CakeModal({
                     )}
                   </div>
 
-                  {/* Campos da cobertura */}
                   <div className="space-y-3">
                     <div>
                       <label className="block text-white/60 text-xs mb-2">Cobertura</label>
@@ -416,7 +463,6 @@ export default function CakeModal({
                         value={frosting.frostingName}
                         onChange={(e) => updateFrosting(index, 'frostingName', e.target.value)}
                         className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                        required
                         style={{ 
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
@@ -428,7 +474,7 @@ export default function CakeModal({
                         <option value="">Selecione a cobertura</option>
                         {cakeFrostings && cakeFrostings.map && cakeFrostings.map(frostingItem => (
                           <option key={frostingItem.name} value={frostingItem.name}>
-                            {frostingItem.name} ({frostingItem.totalGrams}g total)
+                            {frostingItem.name} ({frostingItem.totalGrams}g) - R$ {(frostingItem.cost || calculateMassCost(frostingItem)).toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -444,7 +490,6 @@ export default function CakeModal({
                         value={frosting.grams}
                         onChange={(e) => updateFrosting(index, 'grams', e.target.value)}
                         className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                        required
                       />
                     </div>
                   </div>
@@ -453,17 +498,18 @@ export default function CakeModal({
             </div>
           </div>
 
-          {/* Seção de Insumos - LAYOUT MOBILE FIRST */}
+          {/* Seção de Insumos */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-white font-semibold text-lg">Insumos (opcional)</h3>
-                <p className="text-white/60 text-sm">Formas, velas, decorações, etc. (1 por bolo)</p>
+                <p className="text-white/60 text-sm">Velas, decorações, embalagens, etc.</p>
               </div>
               <button
                 type="button"
                 onClick={addSupply}
                 className="w-10 h-10 rounded-xl bg-primary-500/20 hover:bg-primary-500/30 text-primary-300 flex items-center justify-center transition-colors"
+                disabled={loading}
               >
                 <FaPlus className="w-4 h-4" />
               </button>
@@ -472,7 +518,6 @@ export default function CakeModal({
             <div className="space-y-3">
               {formData.supplies.map((supplyId, index) => (
                 <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header do insumo */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white font-medium text-sm">
                       Insumo {index + 1}
@@ -486,7 +531,6 @@ export default function CakeModal({
                     </button>
                   </div>
 
-                  {/* Campo do insumo */}
                   <div>
                     <label className="block text-white/60 text-xs mb-2">Insumo</label>
                     <select
@@ -502,7 +546,7 @@ export default function CakeModal({
                       }}
                     >
                       <option value="">Selecione o insumo</option>
-                      {supplies && supplies.map && supplies.map(supply => (
+                      {suppliesList && suppliesList.map && suppliesList.map(supply => (
                         <option key={supply?._id || index} value={supply?._id}>
                           {supply?.name} - R$ {supply?.cost?.toFixed(2)}
                         </option>
@@ -515,9 +559,9 @@ export default function CakeModal({
           </div>
 
           {/* Seção de Margem de Lucro */}
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4">
-            <h4 className="text-purple-300 font-semibold mb-3 flex items-center gap-2">
-              <FaCalculator className="w-4 h-4" />
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
+            <h4 className="text-orange-300 font-semibold mb-3 flex items-center gap-2">
+              <FaChartLine className="w-4 h-4" />
               Preço de Venda
             </h4>
 
@@ -557,32 +601,38 @@ export default function CakeModal({
             </div>
           </div>
 
-          {/* Visualização do Custo em Tempo Real */}
-          {(formData.masses.some(mass => mass.massName && mass.grams) || formData.frostings.some(frosting => frosting.frostingName && frosting.grams)) && (
+          {/* VISUALIZAÇÃO DO CUSTO EM TEMPO REAL - CORRIGIDA */}
+          {(formData.masses.some(mass => mass.massName && mass.grams)) && (
             <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4">
               <h4 className="text-green-300 font-semibold mb-3 flex items-center gap-2">
                 <FaCalculator className="w-4 h-4" />
-                Resumo Financeiro por Bolo
+                Resumo Financeiro do Bolo
               </h4>
 
               <div className="space-y-2 text-sm">
-                {costBreakdown.massCost > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-white/80">Custo massas:</span>
-                    <span className="text-blue-400">R$ {costBreakdown.massCost.toFixed(2)}</span>
+                {/* Detalhes das Massas */}
+                {costBreakdown.massDetails.map((massDetail, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span className="text-white/80 truncate">
+                      {massDetail.massName} ({massDetail.grams.toFixed(2)}g):
+                    </span>
+                    <span className="text-blue-400 flex-shrink-0 ml-2">R$ {massDetail.cost.toFixed(2)}</span>
                   </div>
-                )}
+                ))}
 
-                {costBreakdown.frostingCost > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-white/80">Custo coberturas:</span>
-                    <span className="text-pink-400">R$ {costBreakdown.frostingCost.toFixed(2)}</span>
+                {/* Detalhes das Coberturas */}
+                {costBreakdown.frostingDetails.map((frostingDetail, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span className="text-white/80 truncate">
+                      {frostingDetail.frostingName} ({frostingDetail.grams.toFixed(2)}g):
+                    </span>
+                    <span className="text-pink-400 flex-shrink-0 ml-2">R$ {frostingDetail.cost.toFixed(2)}</span>
                   </div>
-                )}
+                ))}
 
                 {costBreakdown.suppliesCost > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-white/80">Custo insumos:</span>
+                    <span className="text-white/80">Custo dos insumos:</span>
                     <span className="text-purple-400">R$ {costBreakdown.suppliesCost.toFixed(2)}</span>
                   </div>
                 )}
@@ -599,7 +649,7 @@ export default function CakeModal({
                       <span className="text-green-400 font-bold">R$ {parseFloat(formData.salePrice).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-white/80">Lucro por bolo:</span>
+                      <span className="text-white/80">Lucro:</span>
                       <span className="text-green-400 font-semibold">
                         R$ {(parseFloat(formData.salePrice) - costBreakdown.totalCost).toFixed(2)}
                       </span>
@@ -610,6 +660,12 @@ export default function CakeModal({
                     </div>
                   </>
                 )}
+
+                {/* Peso total */}
+                <div className="flex justify-between border-t border-white/20 pt-2">
+                  <span className="text-white/80">Peso total do bolo:</span>
+                  <span className="text-orange-400 font-semibold">{costBreakdown.totalGrams.toFixed(2)}g</span>
+                </div>
               </div>
             </div>
           )}

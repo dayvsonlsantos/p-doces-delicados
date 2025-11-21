@@ -4,35 +4,155 @@ import Input from '../UI/Input'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
 import { calculateIngredientCost } from '../../lib/calculations'
-import { FaInfoCircle, FaPlus, FaTimes, FaSave, FaLightbulb } from 'react-icons/fa'
+import { FaInfoCircle, FaPlus, FaTimes, FaSave, FaLightbulb, FaCalculator, FaDollarSign } from 'react-icons/fa'
+
+// Tabela de conversão de unidades para gramas
+const unitConversions = {
+  'un': 50,      // 1 unidade = 50g (padrão para ovos, etc)
+  'kg': 1000,    // 1 kg = 1000g
+  'g': 1,        // 1 g = 1g
+  'l': 1000,     // 1 litro = 1000g
+  'ml': 1,       // 1 ml = 1g
+  'cx': 1000,    // 1 caixa = 1000g
+  'pacote': 1000 // 1 pacote = 1000g
+}
+
+// Função para obter descrição amigável da unidade
+const getUnitDescription = (unit) => {
+  if (!unit) return ''
+  
+  const unitMap = {
+    'un': 'unidades',
+    'kg': 'kg',
+    'g': 'g',
+    'l': 'litros',
+    'ml': 'ml',
+    'cx': 'caixas',
+    'pacote': 'pacotes'
+  }
+  
+  return unitMap[unit.toLowerCase()] || unit
+}
+
+// Função para obter placeholder baseado na unidade
+const getQuantityPlaceholder = (unit) => {
+  if (!unit) return "Selecione um produto primeiro"
+  
+  const placeholderMap = {
+    'un': "Ex: 2",
+    'kg': "Ex: 0.5", 
+    'g': "Ex: 250",
+    'l': "Ex: 1",
+    'ml': "Ex: 500",
+    'cx': "Ex: 1",
+    'pacote': "Ex: 1"
+  }
+  
+  return placeholderMap[unit.toLowerCase()] || `Ex: 1`
+}
+
+// Função para converter para gramas baseado na unidade
+const convertToGrams = (value, unit) => {
+  if (!value || !unit) return 0
+  
+  const quantity = parseFloat(value) || 0
+  const conversionRate = unitConversions[unit.toLowerCase()] || 1
+  
+  return quantity * conversionRate
+}
 
 export default function MassModal({ isOpen, onClose, onSave, mass, products = [] }) {
   const [formData, setFormData] = useState({
     name: '',
     totalGrams: '',
-    ingredients: [{ productId: '', grams: '' }]
+    ingredients: [{ productId: '', grams: '', quantityInput: '', productUnit: '' }]
+  })
+
+  const [costBreakdown, setCostBreakdown] = useState({
+    ingredientCosts: [],
+    totalCost: 0,
+    costPerGram: 0
   })
 
   useEffect(() => {
     if (mass) {
+      // Para edição, carrega os dados existentes
+      const ingredientsWithUnits = mass.ingredients?.map(ingredient => {
+        const product = products.find(p => p._id === ingredient.productId)
+        return {
+          ...ingredient,
+          quantityInput: ingredient.quantityInput || '',
+          productUnit: product?.unit || ''
+        }
+      }) || [{ productId: '', grams: '', quantityInput: '', productUnit: '' }]
+      
       setFormData({
         name: mass.name || '',
         totalGrams: mass.totalGrams || '',
-        ingredients: mass.ingredients || [{ productId: '', grams: '' }]
+        ingredients: ingredientsWithUnits
       })
     } else {
       setFormData({
         name: '',
         totalGrams: '',
-        ingredients: [{ productId: '', grams: '' }]
+        ingredients: [{ productId: '', grams: '', quantityInput: '', productUnit: '' }]
       })
     }
-  }, [mass, isOpen])
+  }, [mass, isOpen, products])
+
+  // Calcular custos quando os ingredientes mudarem
+  useEffect(() => {
+    calculateCosts()
+  }, [formData.ingredients, formData.totalGrams])
+
+  const calculateCosts = () => {
+    let totalCost = 0
+    const ingredientCosts = []
+
+    formData.ingredients.forEach(ingredient => {
+      const product = products.find(p => p._id === ingredient.productId)
+      if (product && ingredient.grams) {
+        const ingredientGrams = parseFloat(ingredient.grams)
+        let cost = 0
+
+        if (product.unit === 'un') {
+          // Para unidades, calcula quantas unidades são necessárias
+          const units = ingredientGrams / unitConversions['un']
+          cost = units * product.unitCost
+        } else {
+          // Para outros, usa baseUnitCost (custo por grama)
+          cost = ingredientGrams * product.baseUnitCost
+        }
+
+        totalCost += cost
+        ingredientCosts.push({
+          productName: product.name,
+          quantity: ingredient.quantityInput,
+          unit: ingredient.productUnit,
+          cost: cost
+        })
+      }
+    })
+
+    const totalGrams = parseFloat(formData.totalGrams) || 1
+    const costPerGram = totalCost / totalGrams
+
+    setCostBreakdown({
+      ingredientCosts,
+      totalCost,
+      costPerGram
+    })
+  }
 
   const addIngredient = () => {
     setFormData({
       ...formData,
-      ingredients: [...formData.ingredients, { productId: '', grams: '' }]
+      ingredients: [...formData.ingredients, { 
+        productId: '', 
+        grams: '', 
+        quantityInput: '',
+        productUnit: '' 
+      }]
     })
   }
 
@@ -43,7 +163,35 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
 
   const updateIngredient = (index, field, value) => {
     const newIngredients = [...formData.ingredients]
-    newIngredients[index][field] = value
+    
+    if (field === 'productId') {
+      const product = products.find(p => p._id === value)
+      const unit = product?.unit || ''
+      
+      newIngredients[index] = {
+        ...newIngredients[index],
+        productId: value,
+        productUnit: unit,
+        // Limpa os campos de quantidade quando muda o produto
+        grams: '',
+        quantityInput: ''
+      }
+    } else if (field === 'quantityInput') {
+      const product = products.find(p => p._id === newIngredients[index].productId)
+      const unit = product?.unit || ''
+      
+      // Converte para gramas baseado na unidade do produto
+      const grams = convertToGrams(value, unit)
+      
+      newIngredients[index] = {
+        ...newIngredients[index],
+        quantityInput: value,
+        grams: grams
+      }
+    } else {
+      newIngredients[index][field] = value
+    }
+    
     setFormData({ ...formData, ingredients: newIngredients })
   }
 
@@ -56,7 +204,7 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
       return
     }
 
-    if (formData.ingredients.some(ing => !ing.productId || !ing.grams)) {
+    if (formData.ingredients.some(ing => !ing.productId || !ing.quantityInput)) {
       alert('Por favor, preencha todos os ingredientes')
       return
     }
@@ -81,14 +229,17 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
       ...formData,
       totalGrams: parseFloat(formData.totalGrams),
       ingredients: formData.ingredients.map(ing => ({
-        ...ing,
-        grams: parseFloat(ing.grams)
+        productId: ing.productId,
+        grams: parseFloat(ing.grams),
+        quantityInput: ing.quantityInput, // Salva o input original
+        productUnit: ing.productUnit // Salva a unidade para referência
       })),
-      // Adicionar informações de cálculo para referência
       calculatedData: {
         totalIngredients: totalIngredients,
         difference: totalFinal - totalIngredients,
-        percentageDifference: totalIngredients > 0 ? ((totalFinal - totalIngredients) / totalIngredients * 100) : 0
+        percentageDifference: totalIngredients > 0 ? ((totalFinal - totalIngredients) / totalIngredients * 100) : 0,
+        totalCost: costBreakdown.totalCost,
+        costPerGram: costBreakdown.costPerGram
       }
     }
 
@@ -100,27 +251,12 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
   const difference = totalGrams - totalIngredientGrams
   const percentageLoss = totalIngredientGrams > 0 ? ((difference / totalIngredientGrams) * 100) : 0
 
-  const calculateMassCost = (ingredients, products) => {
-    let totalCost = 0
-
-    ingredients.forEach(ingredient => {
-      const product = products.find(p => p._id === ingredient.productId)
-      if (product && ingredient.grams) {
-        const ingredientGrams = parseFloat(ingredient.grams)
-        const cost = calculateIngredientCost(ingredientGrams, product)
-        totalCost += cost
-      }
-    })
-
-    return totalCost
-  }
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={mass ? 'Editar Massa' : 'Criar Nova Massa'}
-      size="lg" // Alterado para fullscreen no mobile
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-full">
         {/* Header fixo */}
@@ -139,6 +275,9 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
             </h4>
             <p className="text-blue-200 text-sm">
               Uma massa é a base dos seus docinhos. Defina a receita com os ingredientes e o rendimento total.
+            </p>
+            <p className="text-blue-200 text-sm mt-2">
+              💡 <strong>Dica:</strong> Digite a quantidade na unidade do produto - converteremos automaticamente para gramas!
             </p>
           </div>
 
@@ -221,19 +360,20 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
                 </div>
               )}
 
-              {/* Remover o aviso de erro - apenas informações */}
               <div className="mt-3 text-xs text-white/60">
                 <p>💡 <strong>Dica:</strong> Em docinhos, é normal ter 10-20% de perda por evaporação.</p>
               </div>
             </div>
           )}
 
-          {/* Seção de Ingredientes - LAYOUT MOBILE FIRST */}
+          {/* Seção de Ingredientes */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-white font-semibold text-lg">Ingredientes da Massa</h3>
-                <p className="text-white/60 text-sm">Adicione todos os ingredientes que compõem esta massa</p>
+                <p className="text-white/60 text-sm">
+                  Adicione todos os ingredientes. Digite a quantidade na unidade do produto.
+                </p>
               </div>
               <button
                 type="button"
@@ -245,68 +385,135 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
             </div>
 
             <div className="space-y-3">
-              {formData.ingredients.map((ingredient, index) => (
-                <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header do ingrediente */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-white font-medium text-sm">
-                      Ingrediente {index + 1}
-                    </span>
-                    {formData.ingredients.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(index)}
-                        className="w-6 h-6 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 flex items-center justify-center transition-colors"
-                      >
-                        <FaTimes className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Campos do ingrediente */}
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-white/60 text-xs mb-2">Produto</label>
-                      <select
-                        value={ingredient.productId}
-                        onChange={(e) => updateIngredient(index, 'productId', e.target.value)}
-                        className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                        required
-                        style={{ 
-                          WebkitAppearance: 'none',
-                          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 1rem center',
-                          backgroundSize: '1em'
-                        }}
-                      >
-                        <option value="">Selecione um produto</option>
-                        {products && products.map && products.map(product => (
-                          <option key={product?._id || index} value={product?._id}>
-                            {product?.name} ({product?.unit}) - R$ {product?.cost?.toFixed(2)}
-                          </option>
-                        ))}
-                      </select>
+              {formData.ingredients.map((ingredient, index) => {
+                const product = products.find(p => p._id === ingredient.productId)
+                const unitDescription = getUnitDescription(ingredient.productUnit)
+                const placeholder = getQuantityPlaceholder(ingredient.productUnit)
+                
+                return (
+                  <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
+                    {/* Header do ingrediente */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-white font-medium text-sm">
+                        Ingrediente {index + 1}
+                      </span>
+                      {formData.ingredients.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeIngredient(index)}
+                          className="w-6 h-6 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 flex items-center justify-center transition-colors"
+                        >
+                          <FaTimes className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-white/60 text-xs mb-2">Quantidade (gramas)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={ingredient.grams}
-                        onChange={(e) => updateIngredient(index, 'grams', e.target.value)}
-                        className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                        required
-                      />
+                    {/* Campos do ingrediente */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-white/60 text-xs mb-2">Produto</label>
+                        <select
+                          value={ingredient.productId}
+                          onChange={(e) => updateIngredient(index, 'productId', e.target.value)}
+                          className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                          required
+                          style={{ 
+                            WebkitAppearance: 'none',
+                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 1rem center',
+                            backgroundSize: '1em'
+                          }}
+                        >
+                          <option value="">Selecione um produto</option>
+                          {products && products.map && products.map(product => (
+                            <option key={product?._id || index} value={product?._id}>
+                              {product?.name} ({product?.unit}) - R$ {product?.cost?.toFixed(2)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-white/60 text-xs mb-2">
+                          Quantidade 
+                          {unitDescription && (
+                            <span className="text-primary-300 ml-1">
+                              em {unitDescription}
+                            </span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={placeholder}
+                          value={ingredient.quantityInput || ''}
+                          onChange={(e) => updateIngredient(index, 'quantityInput', e.target.value)}
+                          className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                          required
+                          disabled={!ingredient.productId}
+                        />
+                        {ingredient.productId && (
+                          <div className="text-xs text-white/60 mt-1">
+                            💡 Digite a quantidade em <strong>{unitDescription}</strong>. 
+                            Será convertido automaticamente para gramas.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
+
+          {/* Visualização do Custo em Tempo Real */}
+          {costBreakdown.totalCost > 0 && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4">
+              <h4 className="text-green-300 font-semibold mb-3 flex items-center gap-2">
+                <FaCalculator className="w-4 h-4" />
+                Resumo Financeiro da Massa
+              </h4>
+
+              <div className="space-y-2 text-sm">
+                {/* Detalhes dos Ingredientes */}
+                {costBreakdown.ingredientCosts.map((ingredientCost, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span className="text-white/80 truncate">
+                      {ingredientCost.productName} ({ingredientCost.quantity} {ingredientCost.unit}):
+                    </span>
+                    <span className="text-white flex-shrink-0 ml-2">R$ {ingredientCost.cost.toFixed(4)}</span>
+                  </div>
+                ))}
+
+                <div className="flex justify-between border-t border-white/20 pt-2">
+                  <span className="text-white font-semibold">Custo total da massa:</span>
+                  <span className="text-white font-bold">R$ {costBreakdown.totalCost.toFixed(4)}</span>
+                </div>
+
+                {formData.totalGrams && (
+                  <div className="flex justify-between">
+                    <span className="text-white/80">Custo por grama:</span>
+                    <span className="text-green-400 font-semibold">R$ {costBreakdown.costPerGram.toFixed(6)}</span>
+                  </div>
+                )}
+
+                {formData.totalGrams && costBreakdown.totalCost > 0 && (
+                  <div className="mt-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    <div className="flex items-start gap-2">
+                      <FaDollarSign className="text-blue-400 mt-0.5 w-4 h-4 flex-shrink-0" />
+                      <div>
+                        <p className="text-blue-300 text-sm font-medium mb-1">Custo da Massa</p>
+                        <p className="text-blue-200 text-xs">
+                          Esta massa de {formData.totalGrams}g custa R$ {costBreakdown.totalCost.toFixed(2)} no total.
+                          Cada grama custa R$ {costBreakdown.costPerGram.toFixed(6)}.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer fixo */}

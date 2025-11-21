@@ -105,7 +105,8 @@ export default function Cakes() {
     }
   }
 
-  const canCreateCake = cakeMasses.length > 0 && cakeFrostings.length > 0
+  // AGORA SÓ VERIFICA SE HÁ MASSAS - COBERTURAS SÃO OPCIONAIS
+  const canCreateCake = cakeMasses.length > 0
 
   return (
     <Layout activePage="cakes">
@@ -130,8 +131,12 @@ export default function Cakes() {
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-300 mx-auto mb-2 md:mb-3">
             <FaExclamationTriangle className="w-4 h-4 md:w-5 md:h-5" />
           </div>
-          <h3 className="text-white font-semibold text-sm md:text-base mb-1 md:mb-2">Cadastre massas e coberturas primeiro</h3>
-          <p className="text-white/60 text-xs md:text-sm mb-3 md:mb-4">Você precisa cadastrar massas e coberturas antes de criar bolos</p>
+          <h3 className="text-white font-semibold text-sm md:text-base mb-1 md:mb-2">
+            Cadastre massas primeiro
+          </h3>
+          <p className="text-white/60 text-xs md:text-sm mb-3 md:mb-4">
+            Você precisa cadastrar massas antes de criar bolos. Coberturas são opcionais.
+          </p>
           <div className="flex flex-col xs:flex-row gap-2 md:gap-3 justify-center">
             <GlassButton 
               onClick={() => window.location.href = '/cakes/masses'} 
@@ -140,12 +145,14 @@ export default function Cakes() {
               <FaWeight className="w-3 h-3" />
               Cadastrar Massas
             </GlassButton>
+            {/* Botão opcional para coberturas */}
             <GlassButton 
               onClick={() => window.location.href = '/cakes/frostings'} 
               className="text-xs px-3 py-2"
+              variant="secondary"
             >
               <FaIceCream className="w-3 h-3" />
-              Cadastrar Coberturas
+              Cadastrar Coberturas (Opcional)
             </GlassButton>
           </div>
         </div>

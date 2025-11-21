@@ -1,3 +1,4 @@
+// components/Candies/CandyList.js (atualizado com 2 casas decimais)
 import { FaEdit, FaTrash, FaCookie } from 'react-icons/fa'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
@@ -185,31 +186,31 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                         </div>
                       </div>
 
-                      {/* Custo Detalhado */}
+                      {/* Custo Detalhado - ATUALIZADO PARA 2 CASAS DECIMAIS */}
                       <div className="space-y-1 text-xs md:text-sm">
                         <div className="flex justify-between">
                           <span className="text-white/70">Custo massa(s):</span>
-                          <span className="text-white">R$ {costBreakdown.massCost.toFixed(4)}</span>
+                          <span className="text-white">R$ {costBreakdown.massCost.toFixed(2)}</span>
                         </div>
                         
                         {costBreakdown.extrasCost > 0 && (
                           <div className="flex justify-between">
                             <span className="text-white/70">Custo extras:</span>
-                            <span className="text-yellow-400">R$ {costBreakdown.extrasCost.toFixed(4)}</span>
+                            <span className="text-yellow-400">R$ {costBreakdown.extrasCost.toFixed(2)}</span>
                           </div>
                         )}
                         
                         {costBreakdown.suppliesCost > 0 && (
                           <div className="flex justify-between">
                             <span className="text-white/70">Custo insumos:</span>
-                            <span className="text-blue-400">R$ {costBreakdown.suppliesCost.toFixed(4)}</span>
+                            <span className="text-blue-400">R$ {costBreakdown.suppliesCost.toFixed(2)}</span>
                           </div>
                         )}
                         
                         <div className="flex justify-between border-t border-white/20 pt-1">
                           <span className="text-white font-semibold">Custo total:</span>
                           <span className="text-primary-300 font-bold">
-                            R$ {costBreakdown.totalCost.toFixed(4)} /un
+                            R$ {costBreakdown.totalCost.toFixed(2)} /un
                           </span>
                         </div>
                       </div>
@@ -329,7 +330,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
               </div>
             )}
 
-            {/* Detalhes das Massas Individualmente */}
+            {/* Detalhes das Massas Individualmente - ATUALIZADO PARA 2 CASAS DECIMAIS */}
             {costBreakdown.massDetails.length > 1 && (
               <div className="mt-3 md:mt-4">
                 <h4 className="text-white/80 text-sm font-medium mb-2">Detalhes por Massa:</h4>
@@ -345,7 +346,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                         </div>
                       </div>
                       <span className="text-primary-300 text-xs md:text-sm font-semibold">
-                        R$ {massDetail.cost.toFixed(4)}
+                        R$ {massDetail.cost.toFixed(2)}
                       </span>
                     </div>
                   ))}
