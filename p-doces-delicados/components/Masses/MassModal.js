@@ -1,4 +1,4 @@
-// components/Masses/MassModal.js
+// components/Masses/MassModal.js (atualizado)
 import Modal from '../UI/Modal'
 import Input from '../UI/Input'
 import GlassButton from '../UI/GlassButton'
@@ -8,8 +8,8 @@ import { FaInfoCircle, FaPlus, FaTimes, FaSave, FaLightbulb, FaCalculator, FaDol
 
 // Tabela de conversão de unidades para gramas
 const unitConversions = {
-  'un': 50,      // 1 unidade = 50g (padrão para ovos, etc)
-  'kg': 1000,    // 1 kg = 1000g
+  'un': 0,       // NÃO converte unidades para gramas (valor 0)
+  'kg': 1,       // 1 g = 1g (usuário já informa em gramas)
   'g': 1,        // 1 g = 1g
   'l': 1000,     // 1 litro = 1000g
   'ml': 1,       // 1 ml = 1g
@@ -20,44 +20,71 @@ const unitConversions = {
 // Função para obter descrição amigável da unidade
 const getUnitDescription = (unit) => {
   if (!unit) return ''
-  
+
   const unitMap = {
     'un': 'unidades',
-    'kg': 'kg',
-    'g': 'g',
+    'kg': 'gramas', // Alterado para gramas
+    'g': 'gramas',
     'l': 'litros',
     'ml': 'ml',
     'cx': 'caixas',
     'pacote': 'pacotes'
   }
-  
+
   return unitMap[unit.toLowerCase()] || unit
 }
 
 // Função para obter placeholder baseado na unidade
 const getQuantityPlaceholder = (unit) => {
   if (!unit) return "Selecione um produto primeiro"
-  
+
   const placeholderMap = {
     'un': "Ex: 2",
-    'kg': "Ex: 0.5", 
+    'kg': "Ex: 500", // Alterado para exemplo em gramas
     'g': "Ex: 250",
     'l': "Ex: 1",
     'ml': "Ex: 500",
     'cx': "Ex: 1",
     'pacote': "Ex: 1"
   }
-  
+
   return placeholderMap[unit.toLowerCase()] || `Ex: 1`
+}
+
+// Função para obter label do campo de quantidade
+const getQuantityLabel = (unit) => {
+  if (!unit) return 'Quantidade'
+
+  const labelMap = {
+    'un': 'Quantidade (unidades)',
+    'kg': 'Quantidade (gramas)', // Alterado para gramas
+    'g': 'Quantidade (gramas)',
+    'l': 'Quantidade (litros)',
+    'ml': 'Quantidade (ml)',
+    'cx': 'Quantidade (caixas)',
+    'pacote': 'Quantidade (pacotes)'
+  }
+
+  return labelMap[unit.toLowerCase()] || 'Quantidade'
 }
 
 // Função para converter para gramas baseado na unidade
 const convertToGrams = (value, unit) => {
   if (!value || !unit) return 0
-  
+
   const quantity = parseFloat(value) || 0
+
+  // Se for unidade, NÃO converte para gramas (mantém 0)
+  if (unit.toLowerCase() === 'un') {
+    return 0 // Não converte unidades para gramas
+  }
+
+  // Se a unidade for kg, o usuário já está informando em gramas
+  if (unit.toLowerCase() === 'kg') {
+    return quantity // Já está em gramas
+  }
+
   const conversionRate = unitConversions[unit.toLowerCase()] || 1
-  
   return quantity * conversionRate
 }
 
@@ -85,7 +112,7 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
           productUnit: product?.unit || ''
         }
       }) || [{ productId: '', grams: '', quantityInput: '', productUnit: '' }]
-      
+
       setFormData({
         name: mass.name || '',
         totalGrams: mass.totalGrams || '',
@@ -111,16 +138,16 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
 
     formData.ingredients.forEach(ingredient => {
       const product = products.find(p => p._id === ingredient.productId)
-      if (product && ingredient.grams) {
-        const ingredientGrams = parseFloat(ingredient.grams)
+      if (product && ingredient.quantityInput) {
         let cost = 0
 
         if (product.unit === 'un') {
-          // Para unidades, calcula quantas unidades são necessárias
-          const units = ingredientGrams / unitConversions['un']
+          // Para unidades, usa diretamente o quantityInput e unitCost
+          const units = parseFloat(ingredient.quantityInput) || 0
           cost = units * product.unitCost
         } else {
-          // Para outros, usa baseUnitCost (custo por grama)
+          // Para outros, converte para gramas e usa baseUnitCost
+          const ingredientGrams = parseFloat(ingredient.grams) || 0
           cost = ingredientGrams * product.baseUnitCost
         }
 
@@ -147,11 +174,11 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
   const addIngredient = () => {
     setFormData({
       ...formData,
-      ingredients: [...formData.ingredients, { 
-        productId: '', 
-        grams: '', 
+      ingredients: [...formData.ingredients, {
+        productId: '',
+        grams: '',
         quantityInput: '',
-        productUnit: '' 
+        productUnit: ''
       }]
     })
   }
@@ -163,11 +190,11 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
 
   const updateIngredient = (index, field, value) => {
     const newIngredients = [...formData.ingredients]
-    
+
     if (field === 'productId') {
       const product = products.find(p => p._id === value)
       const unit = product?.unit || ''
-      
+
       newIngredients[index] = {
         ...newIngredients[index],
         productId: value,
@@ -179,10 +206,10 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
     } else if (field === 'quantityInput') {
       const product = products.find(p => p._id === newIngredients[index].productId)
       const unit = product?.unit || ''
-      
+
       // Converte para gramas baseado na unidade do produto
       const grams = convertToGrams(value, unit)
-      
+
       newIngredients[index] = {
         ...newIngredients[index],
         quantityInput: value,
@@ -191,7 +218,7 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
     } else {
       newIngredients[index][field] = value
     }
-    
+
     setFormData({ ...formData, ingredients: newIngredients })
   }
 
@@ -277,7 +304,7 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
               Uma massa é a base dos seus docinhos. Defina a receita com os ingredientes e o rendimento total.
             </p>
             <p className="text-blue-200 text-sm mt-2">
-              💡 <strong>Dica:</strong> Digite a quantidade na unidade do produto - converteremos automaticamente para gramas!
+              💡 <strong>Importante:</strong> Para produtos em kg, informe a quantidade em GRAMAS!
             </p>
           </div>
 
@@ -305,9 +332,8 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
 
           {/* Informação do total */}
           {formData.totalGrams && (
-            <div className={`p-4 rounded-2xl border ${
-              Math.abs(percentageLoss) > 5 ? 'bg-orange-500/10 border-orange-500/20' : 'bg-green-500/10 border-green-500/20'
-            }`}>
+            <div className={`p-4 rounded-2xl border ${Math.abs(percentageLoss) > 5 ? 'bg-orange-500/10 border-orange-500/20' : 'bg-green-500/10 border-green-500/20'
+              }`}>
               <div className="flex justify-between items-center text-sm mb-2">
                 <span className="text-white/80">Soma dos ingredientes:</span>
                 <span className="text-white font-semibold">
@@ -322,9 +348,8 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-white/80">Diferença (perda/ganho):</span>
-                <span className={`font-semibold ${
-                  difference > 0 ? 'text-green-400' : difference < 0 ? 'text-orange-400' : 'text-white'
-                }`}>
+                <span className={`font-semibold ${difference > 0 ? 'text-green-400' : difference < 0 ? 'text-orange-400' : 'text-white'
+                  }`}>
                   {difference > 0 ? '+' : ''}{difference.toFixed(2)}g
                   {totalIngredientGrams > 0 && ` (${percentageLoss > 0 ? '+' : ''}${percentageLoss.toFixed(1)}%)`}
                 </span>
@@ -372,7 +397,7 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
               <div>
                 <h3 className="text-white font-semibold text-lg">Ingredientes da Massa</h3>
                 <p className="text-white/60 text-sm">
-                  Adicione todos os ingredientes. Digite a quantidade na unidade do produto.
+                  Adicione todos os ingredientes. Para produtos em kg, informe em GRAMAS.
                 </p>
               </div>
               <button
@@ -389,7 +414,8 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
                 const product = products.find(p => p._id === ingredient.productId)
                 const unitDescription = getUnitDescription(ingredient.productUnit)
                 const placeholder = getQuantityPlaceholder(ingredient.productUnit)
-                
+                const quantityLabel = getQuantityLabel(ingredient.productUnit)
+
                 return (
                   <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
                     {/* Header do ingrediente */}
@@ -417,7 +443,7 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
                           onChange={(e) => updateIngredient(index, 'productId', e.target.value)}
                           className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                           required
-                          style={{ 
+                          style={{
                             WebkitAppearance: 'none',
                             backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                             backgroundRepeat: 'no-repeat',
@@ -436,15 +462,12 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
 
                       <div>
                         <label className="block text-white/60 text-xs mb-2">
-                          Quantidade 
-                          {unitDescription && (
-                            <span className="text-primary-300 ml-1">
-                              em {unitDescription}
-                            </span>
-                          )}
+                          {quantityLabel}
                         </label>
                         <input
-                          type="text"
+                          type="number"
+                          step="0.01"
+                          min="0"
                           placeholder={placeholder}
                           value={ingredient.quantityInput || ''}
                           onChange={(e) => updateIngredient(index, 'quantityInput', e.target.value)}
@@ -452,10 +475,30 @@ export default function MassModal({ isOpen, onClose, onSave, mass, products = []
                           required
                           disabled={!ingredient.productId}
                         />
-                        {ingredient.productId && (
+                        {ingredient.productId && ingredient.productUnit === 'kg' && (
+                          <div className="text-xs text-blue-400 mt-1">
+                            💡 Informe a quantidade em <strong>GRAMAS</strong>. Ex: 1kg = 1000g
+                          </div>
+                        )}
+                        {ingredient.productId && ingredient.productUnit !== 'kg' && ingredient.productUnit !== 'un' && (
                           <div className="text-xs text-white/60 mt-1">
-                            💡 Digite a quantidade em <strong>{unitDescription}</strong>. 
+                            💡 Digite a quantidade em <strong>{unitDescription}</strong>.
                             Será convertido automaticamente para gramas.
+                          </div>
+                        )}
+                        {ingredient.productId && ingredient.productUnit === 'un' && (
+                          <div className="text-xs text-white/60 mt-1">
+                            💡 Digite a quantidade em <strong>unidades</strong>.
+                          </div>
+                        )}
+                        {ingredient.grams > 0 && ingredient.productUnit === 'kg' && (
+                          <div className="text-xs text-green-400 mt-1">
+                            ✅ Quantidade informada: {ingredient.grams.toFixed(2)}g
+                          </div>
+                        )}
+                        {ingredient.quantityInput && ingredient.productUnit === 'un' && (
+                          <div className="text-xs text-green-400 mt-1">
+                            ✅ Quantidade informada: {ingredient.quantityInput} unidades
                           </div>
                         )}
                       </div>

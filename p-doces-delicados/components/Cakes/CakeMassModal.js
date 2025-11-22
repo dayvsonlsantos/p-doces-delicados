@@ -44,7 +44,7 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
 
     const unitMap = {
       'un': 'unidades',
-      'kg': 'quilogramas',
+      'kg': 'gramas', // Alterado para gramas
       'g': 'gramas',
       'l': 'litros',
       'ml': 'mililitros',
@@ -61,7 +61,7 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
 
     const placeholderMap = {
       'un': "Ex: 2",
-      'kg': "Ex: 0.5",
+      'kg': "Ex: 500", // Alterado para exemplo em gramas
       'g': "Ex: 250",
       'l': "Ex: 1",
       'ml': "Ex: 500",
@@ -70,6 +70,23 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
     }
 
     return placeholderMap[unit.toLowerCase()] || "0.00"
+  }
+
+  // Função para obter label do campo de quantidade
+  const getQuantityLabel = (unit) => {
+    if (!unit) return 'Quantidade'
+
+    const labelMap = {
+      'un': 'Quantidade (unidades)',
+      'kg': 'Quantidade (gramas)', // Alterado para gramas
+      'g': 'Quantidade (gramas)',
+      'l': 'Quantidade (litros)',
+      'ml': 'Quantidade (ml)',
+      'cx': 'Quantidade (caixas)',
+      'pacote': 'Quantidade (pacotes)'
+    }
+
+    return labelMap[unit.toLowerCase()] || 'Quantidade'
   }
 
   const removeIngredient = (index) => {
@@ -111,14 +128,19 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
     setFormData({ ...formData, ingredients: newIngredients })
   }
 
-  // Função de conversão
+  // Função de conversão ATUALIZADA
   const convertToGrams = (value, unit) => {
     if (!value || !unit) return 0
 
     const quantity = parseFloat(value) || 0
+    
+    // Se a unidade for kg, o usuário já está informando em gramas
+    if (unit.toLowerCase() === 'kg') {
+      return quantity // Já está em gramas
+    }
+
     const conversions = {
       'un': 50,      // 1 unidade = 50g
-      'kg': 1000,    // 1 kg = 1000g
       'g': 1,        // 1 g = 1g
       'l': 1000,     // 1 litro = 1000g
       'ml': 1,       // 1 ml = 1g
@@ -196,6 +218,9 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
               Defina a receita da massa e quantos bolos ela rende. O sistema calculará automaticamente
               os ingredientes necessários por bolo.
             </p>
+            <p className="text-blue-200 text-sm mt-2">
+              💡 <strong>Importante:</strong> Para produtos em kg, informe a quantidade em GRAMAS.
+            </p>
           </div>
 
           {/* Informações básicas */}
@@ -268,12 +293,14 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
             </div>
           )}
 
-          {/* Seção de Ingredientes - LAYOUT MOBILE FIRST */}
+          {/* Seção de Ingredientes */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-white font-semibold text-lg">Ingredientes</h3>
-                <p className="text-white/60 text-sm">Adicione os ingredientes da massa</p>
+                <p className="text-white/60 text-sm">
+                  Adicione os ingredientes da massa. Para produtos em kg, informe em GRAMAS.
+                </p>
               </div>
               <button
                 type="button"
@@ -331,12 +358,7 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
 
                     <div>
                       <label className="block text-white/60 text-xs mb-2">
-                        Quantidade {' '}
-                        {ingredient.productUnit && (
-                          <span className="text-primary-300">
-                            ({getUnitDescription(ingredient.productUnit)})
-                          </span>
-                        )}
+                        {getQuantityLabel(ingredient.productUnit)}
                       </label>
                       <input
                         type="number"
@@ -349,9 +371,19 @@ export default function CakeMassModal({ isOpen, onClose, onSave, mass, products 
                         required
                         disabled={!ingredient.productId}
                       />
-                      {ingredient.grams > 0 && (
+                      {ingredient.productId && ingredient.productUnit === 'kg' && (
+                        <div className="text-xs text-blue-400 mt-1">
+                          💡 Informe a quantidade em <strong>GRAMAS</strong>. Ex: 1kg = 1000g
+                        </div>
+                      )}
+                      {ingredient.grams > 0 && ingredient.productUnit !== 'kg' && (
                         <div className="text-xs text-green-400 mt-1">
                           💡 Equivale a {ingredient.grams.toFixed(2)}g
+                        </div>
+                      )}
+                      {ingredient.grams > 0 && ingredient.productUnit === 'kg' && (
+                        <div className="text-xs text-green-400 mt-1">
+                          ✅ Quantidade informada: {ingredient.grams.toFixed(2)}g
                         </div>
                       )}
                     </div>

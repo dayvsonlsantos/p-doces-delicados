@@ -99,7 +99,7 @@ export default function CakeMasses() {
   // Função para obter descrição amigável da unidade
   const getUnitDescription = (unit) => {
     if (!unit) return ''
-    
+
     const unitMap = {
       'un': 'unidades',
       'kg': 'kg',
@@ -109,7 +109,7 @@ export default function CakeMasses() {
       'cx': 'caixas',
       'pacote': 'pacotes'
     }
-    
+
     return unitMap[unit.toLowerCase()] || unit
   }
 
@@ -164,27 +164,37 @@ export default function CakeMasses() {
     return product ? product.name : 'Produto não encontrado'
   }
 
-  // Função para formatar a exibição do ingrediente na unidade original
+  // Função para formatar a exibição do ingrediente na unidade original - ATUALIZADA
+  // Função para formatar a exibição do ingrediente na unidade original - CORRIGIDA
   const getIngredientDisplay = (ingredient) => {
     const product = products.find(p => p._id === ingredient.productId)
     if (!product) return 'Produto não encontrado'
 
     // Se tem quantityInput (nova versão), mostra na unidade original
     if (ingredient.quantityInput && ingredient.productUnit) {
+      // PARA PRODUTOS EM KG: Mostra diretamente em gramas (sem conversão)
+      if (ingredient.productUnit.toLowerCase() === 'kg') {
+        return `${ingredient.quantityInput} g` // Mostra diretamente como gramas
+      }
+
       const unitDescription = getUnitDescription(ingredient.productUnit)
       return `${ingredient.quantityInput} ${unitDescription}`
-    } 
+    }
     // Se é versão antiga (apenas grams), converte para a unidade do produto
     else if (ingredient.grams && product.unit) {
+      // PARA PRODUTOS EM KG: Mostra diretamente em gramas
+      if (product.unit.toLowerCase() === 'kg') {
+        return `${ingredient.grams} g`
+      }
+
       const quantity = convertGramsToOriginalUnit(ingredient.grams, product.unit)
       const unitDescription = getUnitDescription(product.unit)
       return `${quantity} ${unitDescription}`
     }
-    
+
     return 'Quantidade não definida'
   }
-
-  // Função para converter gramas de volta para a unidade original
+  // Função para converter gramas de volta para a unidade original - ATUALIZADA
   const convertGramsToOriginalUnit = (grams, unit) => {
     const gramsValue = parseFloat(grams) || 0
     const conversions = {
@@ -196,17 +206,37 @@ export default function CakeMasses() {
       'cx': 1000,    // 1 caixa = 1000g
       'pacote': 1000 // 1 pacote = 1000g
     }
-    
+
     const conversionRate = conversions[unit.toLowerCase()] || 1
     const result = gramsValue / conversionRate
-    
-    // Formata para ter no máximo 2 casas decimais
-    return result % 1 === 0 ? result.toString() : result.toFixed(2)
+
+    // Formata para ter no máximo 3 casas decimais
+    if (result % 1 === 0) {
+      return result.toString()
+    } else if (result < 1) {
+      return result.toFixed(3)
+    } else {
+      return result.toFixed(2)
+    }
   }
 
   // Função para obter o produto de um ingrediente
   const getIngredientProduct = (ingredient) => {
     return products.find(p => p._id === ingredient.productId)
+  }
+
+  // Função para obter a unidade de exibição correta - NOVA FUNÇÃO
+  // Função para obter a unidade de exibição correta - CORRIGIDA
+  const getDisplayUnit = (ingredient) => {
+    const product = products.find(p => p._id === ingredient.productId)
+    if (!product) return ''
+
+    // Se é um produto em kg, mostra como GRAMAS na exibição
+    if (product.unit.toLowerCase() === 'kg') {
+      return 'g' // Alterado de 'kg' para 'g'
+    }
+
+    return getUnitDescription(product.unit)
   }
 
   return (
@@ -317,7 +347,8 @@ export default function CakeMasses() {
                     {mass.ingredients?.map((ingredient, index) => {
                       const product = getIngredientProduct(ingredient)
                       const displayText = getIngredientDisplay(ingredient)
-                      
+                      const displayUnit = getDisplayUnit(ingredient)
+
                       return (
                         <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
                           <div className="min-w-0 flex-1">
@@ -329,7 +360,7 @@ export default function CakeMasses() {
                             </div>
                             {product && (
                               <div className="text-white/40 text-xs mt-1">
-                                {product.unit.toUpperCase()}
+                                {displayUnit.toUpperCase()}
                               </div>
                             )}
                           </div>

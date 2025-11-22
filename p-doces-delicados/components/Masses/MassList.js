@@ -2,7 +2,94 @@ import { FaEdit, FaTrash } from 'react-icons/fa'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
 
+// Função para obter descrição amigável da unidade
+const getUnitDescription = (unit, quantity = 1) => {
+  if (!unit) return ''
+
+  const unitMap = {
+    'un': quantity === 1 ? 'unidade' : 'unidades',
+    'kg': 'g',
+    'g': 'g',
+    'l': quantity === 1 ? 'litro' : 'litros',
+    'ml': 'ml',
+    'cx': quantity === 1 ? 'caixa' : 'caixas',
+    'pacote': quantity === 1 ? 'pacote' : 'pacotes'
+  }
+
+  return unitMap[unit.toLowerCase()] || unit
+}
+const getIngredientDisplay = (ingredient, products = []) => {
+  if (!ingredient) return 'Ingrediente não definido'
+
+  const product = products.find(p => p._id === ingredient.productId)
+  if (!product) return 'Produto não encontrado'
+
+  // Se tem quantityInput, mostra na unidade original
+  if (ingredient.quantityInput && ingredient.productUnit) {
+    const quantity = parseFloat(ingredient.quantityInput) || 0
+    const unitDescription = getUnitDescription(ingredient.productUnit, quantity)
+
+    // Para produtos em unidade, mostra como unidades
+    if (ingredient.productUnit.toLowerCase() === 'un') {
+      const quantity = parseFloat(ingredient.quantityInput) || 0
+      const unitWord = quantity === 1 ? 'unidade' : 'unidades'
+      return `${quantity} ${unitWord}`
+    }
+
+    // Para kg, mostra em gramas
+    if (ingredient.productUnit.toLowerCase() === 'kg') {
+      return `${ingredient.quantityInput} g`
+    }
+
+    return `${ingredient.quantityInput} ${unitDescription}`
+  }
+  // Se é versão antiga (apenas grams)
+  else if (ingredient.grams && product.unit) {
+    // Para unidades, converte de volta
+    if (product.unit.toLowerCase() === 'un') {
+      const units = (parseFloat(ingredient.grams) || 0) / 50 // 50g por unidade
+      const unitDescription = getUnitDescription('un', units)
+      return `${units.toFixed(1)} ${unitDescription}`
+    }
+
+    // Para kg, mostra em gramas
+    if (product.unit.toLowerCase() === 'kg') {
+      return `${ingredient.grams} g`
+    }
+
+    const quantity = parseFloat(ingredient.grams) || 0
+    const unitDescription = getUnitDescription(product.unit, quantity)
+    return `${ingredient.grams} ${unitDescription}`
+  }
+
+  return 'Quantidade não definida'
+}
+
+// Função para obter a unidade de exibição - ATUALIZADA
+const getDisplayUnit = (ingredient, products = []) => {
+  if (!ingredient) return ''
+
+  const product = products.find(p => p._id === ingredient.productId)
+  if (!product) return ''
+
+  // Se é um produto em unidade, mostra como "unidades" (plural genérico)
+  if (product.unit.toLowerCase() === 'un') {
+    return 'unidades'
+  }
+
+  // Se é um produto em kg, mostra como "g"
+  if (product.unit.toLowerCase() === 'kg') {
+    return 'g'
+  }
+
+  return getUnitDescription(product.unit)
+}
+
 export default function MassList({ masses, products, onEdit, onDelete }) {
+  // Verificação segura no início da função
+  const safeMasses = Array.isArray(masses) ? masses : []
+  const safeProducts = Array.isArray(products) ? products : []
+
   const [supplies, setSupplies] = useState([])
 
   useEffect(() => {
@@ -24,15 +111,31 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
     const ingredientCosts = []
 
     mass.ingredients?.forEach(ingredient => {
-      const product = products.find(p => p._id === ingredient.productId)
-      if (product && ingredient.grams) {
-        const ingredientGrams = parseFloat(ingredient.grams)
+      const product = safeProducts.find(p => p._id === ingredient.productId)
+      if (product) {
         let cost = 0
+        let costPerUnit = 0
+        let unitType = 'g'
 
         if (product.unit === 'un') {
-          cost = product.unitCost
+          // Para unidades, usa o quantityInput se disponível
+          if (ingredient.quantityInput) {
+            const units = parseFloat(ingredient.quantityInput) || 0
+            cost = units * product.unitCost
+            costPerUnit = product.unitCost
+            unitType = 'un'
+          } else {
+            // Fallback para versão antiga
+            cost = product.unitCost
+            costPerUnit = product.unitCost
+            unitType = 'un'
+          }
         } else {
+          // Para outros produtos, calcula por grama
+          const ingredientGrams = parseFloat(ingredient.grams) || 0
           cost = ingredientGrams * product.baseUnitCost
+          costPerUnit = product.baseUnitCost
+          unitType = 'g'
         }
 
         totalCost += cost
@@ -40,7 +143,8 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
           name: product.name,
           grams: ingredient.grams,
           cost: cost,
-          costPerGram: cost / ingredientGrams
+          costPerUnit: costPerUnit,
+          unitType: unitType
         })
       }
     })
@@ -53,11 +157,12 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
   }
 
   const getProductName = (productId) => {
-    const product = products.find(p => p._id === productId)
+    const product = safeProducts.find(p => p._id === productId)
     return product ? product.name : 'Produto não encontrado'
   }
 
-  if (masses.length === 0) {
+  // Verificação segura para masses
+  if (!safeMasses || safeMasses.length === 0) {
     return (
       <div className="text-center py-8 md:py-12">
         <div className="w-16 h-16 md:w-24 md:h-24 rounded-2xl bg-white/10 flex items-center justify-center text-white/30 mx-auto mb-4">
@@ -71,7 +176,7 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {masses.map((mass) => {
+      {safeMasses.map((mass) => {
         const costData = calculateMassCost(mass)
 
         return (
@@ -125,11 +230,19 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
               </div>
             </div>
 
-            {/* Ingredientes com custos */}
+            {/* Ingredientes com custos - CORRIGIDO */}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-              {mass.ingredients?.map((ingredient, index) => {
-                const product = products.find(p => p._id === ingredient.productId)
+              {(mass.ingredients || []).map((ingredient, index) => {
+                const product = safeProducts.find(p => p._id === ingredient.productId)
                 const ingredientCost = costData.ingredientCosts[index]
+                const displayText = getIngredientDisplay(ingredient, safeProducts)
+                const displayUnit = getDisplayUnit(ingredient, safeProducts)
+
+                const isUnitProduct = product?.unit?.toLowerCase() === 'un'
+                const costDisplay = isUnitProduct
+                  ? `R$ ${ingredientCost?.costPerUnit?.toFixed(2) || '0.00'}/un`
+                  : `R$ ${ingredientCost?.costPerUnit?.toFixed(4) || '0.0000'}/g`
 
                 return (
                   <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
@@ -138,11 +251,16 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
                         {getProductName(ingredient.productId)}
                       </span>
                       <div className="text-white/60 text-xs">
-                        {ingredient.grams}g • R$ {ingredientCost?.costPerGram?.toFixed(4)}/g
+                        {displayText} • {costDisplay}
                       </div>
+                      {product && (
+                        <div className="text-white/40 text-xs mt-1">
+                          {displayUnit.toUpperCase()}
+                        </div>
+                      )}
                     </div>
                     <span className="text-primary-300 font-semibold text-sm md:text-base">
-                      R$ {ingredientCost?.cost?.toFixed(2)}
+                      R$ {ingredientCost?.cost?.toFixed(2) || '0.00'}
                     </span>
                   </div>
                 )

@@ -327,18 +327,6 @@ export default function OrderList({ orders, onEdit, onDelete, onComplete, onCalc
             >
               Todas as datas
             </button>
-            <button
-              onClick={() => {
-                setFilters(prev => ({
-                  ...prev,
-                  startDate: '',
-                  endDate: ''
-                }))
-              }}
-              className="px-3 py-2 text-sm bg-white/10 hover:bg-white/20 text-white/60 rounded-xl transition-colors"
-            >
-              Todas as datas
-            </button>
           </div>
         </div>
 

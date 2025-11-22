@@ -36,8 +36,8 @@ export default function CandyMasses() {
       const massesData = await massesRes.json()
       const productsData = await productsRes.json()
 
-      setMasses(massesData)
-      setProducts(productsData)
+      setMasses(massesData || [])
+      setProducts(productsData || [])
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
       alert('Erro ao carregar dados: ' + error.message)

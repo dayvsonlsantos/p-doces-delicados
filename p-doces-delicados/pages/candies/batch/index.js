@@ -1,4 +1,4 @@
-// pages/batch.js - completo com arredondamento e salvar PNG
+// pages/batch.js - completo com unidades corrigidas
 import Layout from '../../../components/Layout/Layout'
 import GlassCard from '../../../components/UI/GlassCard'
 import GlassButton from '../../../components/UI/GlassButton'
@@ -6,9 +6,49 @@ import { useState, useEffect, useRef } from 'react'
 import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp, FaDownload } from 'react-icons/fa'
 import html2canvas from 'html2canvas'
 
+// Funções de conversão de unidades
+const convertUnit = (value, fromUnit, toUnit) => {
+  if (fromUnit === toUnit) return value
+  
+  const conversions = {
+    'kg': { 'g': 1000, 'mg': 1000000 },
+    'g': { 'kg': 0.001, 'mg': 1000 },
+    'mg': { 'kg': 0.000001, 'g': 0.001 },
+    'l': { 'ml': 1000, 'cl': 100 },
+    'ml': { 'l': 0.001, 'cl': 0.1 },
+    'cl': { 'l': 0.01, 'ml': 10 },
+    'un': { 'un': 1 }
+  }
+  
+  return value * (conversions[fromUnit]?.[toUnit] || 1)
+}
+
+const getDisplayUnit = (unit) => {
+  const unitMap = {
+    'kg': 'g',
+    'g': 'g', 
+    'mg': 'g',
+    'l': 'ml',
+    'ml': 'ml',
+    'cl': 'ml',
+    'un': 'un'
+  }
+  return unitMap[unit] || unit
+}
+
+const formatQuantity = (value, unit) => {
+  const displayUnit = getDisplayUnit(unit)
+  const convertedValue = convertUnit(value, unit, displayUnit)
+  
+  if (displayUnit === 'un') {
+    return `${Math.ceil(convertedValue)} ${displayUnit}`
+  }
+  
+  return `${convertedValue.toFixed(2)}${displayUnit}`
+}
+
 // Função de arredondamento para gramas
 const roundGrams = (grams) => {
-  // Arredondamento: 0.5+ → 1g, menos → 0g
   return grams >= 0.5 ? Math.round(grams) : 0
 }
 
@@ -63,7 +103,7 @@ export default function BatchCalculator() {
     }))
   }
 
-  // Função para calcular ingredientes totais de uma massa com arredondamento
+  // Função para calcular ingredientes totais de uma massa com unidades CORRIGIDA
   const calculateMassIngredients = (mass, totalGrams) => {
     const scaleFactor = totalGrams / mass.totalGrams
     const ingredients = {}
@@ -72,14 +112,29 @@ export default function BatchCalculator() {
       const product = products.find(p => p._id === ingredient.productId)
       if (product) {
         let scaledGrams = ingredient.grams * scaleFactor
-        // Aplicar arredondamento
-        scaledGrams = roundGrams(scaledGrams)
         
-        // Só adiciona se tiver pelo menos 0.5g (que vira 1g)
-        if (scaledGrams >= 0.5) {
-          ingredients[product.name] = {
-            grams: scaledGrams,
-            product: product
+        if (product.unit === 'un') {
+          // Para unidades, calcula quantas unidades inteiras são necessárias
+          const unitWeight = product.unitWeight || 50
+          const units = Math.ceil(scaledGrams / unitWeight)
+          if (units > 0) {
+            ingredients[product.name] = {
+              quantity: units,
+              unit: 'un',
+              product: product
+            }
+          }
+        } else {
+          // Para outros, aplica arredondamento e converte para unidade de display
+          scaledGrams = roundGrams(scaledGrams)
+          if (scaledGrams >= 0.5) {
+            const displayUnit = getDisplayUnit(product.unit)
+            const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
+            ingredients[product.name] = {
+              quantity: convertedValue,
+              unit: displayUnit,
+              product: product
+            }
           }
         }
       }
@@ -104,7 +159,6 @@ export default function BatchCalculator() {
           const candyRevenue = candy.salePrice ? parseFloat(candy.salePrice) * quantity : 0
           const candyProfit = candyRevenue - (candyCost * quantity)
 
-          // Detalhes do docinho
           candyDetails.push({
             candy,
             quantity,
@@ -117,7 +171,6 @@ export default function BatchCalculator() {
           totalRevenue += candyRevenue
           totalProfit += candyProfit
 
-          // Agrupar por massa (suporta múltiplas massas)
           const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
 
           candyMasses.forEach(massItem => {
@@ -133,7 +186,6 @@ export default function BatchCalculator() {
                 }
 
                 let massGrams = massItem.grams * quantity
-                // Aplicar arredondamento no total por massa
                 massGrams = roundGrams(massGrams)
                 
                 massGroups[massItem.massName].totalGrams += massGrams
@@ -162,17 +214,14 @@ export default function BatchCalculator() {
     if (!resultsRef.current) return
 
     try {
-      // Salvar estado atual das seções
       const originalExpandedState = { ...expandedSections }
       
-      // Expandir todas as seções temporariamente
       setExpandedSections({
         candies: true,
         masses: true,
         summary: true
       })
 
-      // Aguardar o React atualizar a UI
       await new Promise(resolve => setTimeout(resolve, 100))
 
       const canvas = await html2canvas(resultsRef.current, {
@@ -187,7 +236,6 @@ export default function BatchCalculator() {
       link.href = canvas.toDataURL('image/png')
       link.click()
 
-      // Restaurar estado original das seções
       setExpandedSections(originalExpandedState)
 
     } catch (error) {
@@ -257,12 +305,10 @@ export default function BatchCalculator() {
           </h4>
           <div className="space-y-3">
             {Object.entries(calculations.massGroups).map(([massName, massData]) => {
-              // Filtrar apenas massas que têm pelo menos 1g após arredondamento
               if (massData.totalGrams < 0.5) return null
 
               const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
-              // Filtrar ingredientes que têm pelo menos 1g após arredondamento
-              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
               return (
                 <div key={massName} className="p-3 rounded-lg bg-white/5">
@@ -291,7 +337,10 @@ export default function BatchCalculator() {
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {roundGrams(data.grams)}g
+                              {data.unit === 'un' 
+                                ? `${data.quantity} ${data.unit}`
+                                : `${data.quantity}${data.unit}`
+                              }
                             </span>
                           </div>
                         ))}
@@ -309,10 +358,10 @@ export default function BatchCalculator() {
         </div>
       )}
 
-      {/* Informação sobre arredondamento */}
+      {/* Informação sobre unidades e arredondamento */}
       <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
         <p className="text-blue-300 text-xs text-center">
-          💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g = 0g, 0.5g+ = inteiro mais próximo
+          💡 <strong>Unidades convertidas:</strong> Kg → g, L → ml, Unidades mantidas como "un"
         </p>
       </div>
     </div>
@@ -479,14 +528,12 @@ export default function BatchCalculator() {
               {expandedSections.masses && (
                 <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
                   {Object.entries(calculations.massGroups).map(([massName, massData]) => {
-                    // Filtrar apenas massas que têm pelo menos 1g após arredondamento
                     if (massData.totalGrams < 0.5) {
                       return null
                     }
 
                     const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
-                    // Filtrar ingredientes que têm pelo menos 1g após arredondamento
-                    const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+                    const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
                     return (
                       <div key={massName} className="p-4 rounded-xl bg-white/5">
@@ -517,7 +564,10 @@ export default function BatchCalculator() {
                                 <div key={productName} className="flex justify-between text-sm">
                                   <span className="text-white">{productName}</span>
                                   <span className="text-primary-300 font-semibold">
-                                    {roundGrams(data.grams)}g
+                                    {data.unit === 'un' 
+                                      ? `${data.quantity} ${data.unit}`
+                                      : `${data.quantity}${data.unit}`
+                                    }
                                   </span>
                                 </div>
                               ))}
@@ -530,7 +580,7 @@ export default function BatchCalculator() {
                         )}
                       </div>
                     )
-                  }).filter(Boolean) /* Remove null values */}
+                  }).filter(Boolean)}
                 </div>
               )}
             </div>
@@ -545,12 +595,11 @@ export default function BatchCalculator() {
         </GlassCard>
       </div>
 
-      {/* Informação sobre arredondamento */}
+      {/* Informação sobre unidades */}
       {calculations && (
         <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
           <p className="text-blue-300 text-sm text-center">
-            💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g são considerados 0g, 
-            valores de 0.5g ou mais são arredondados para o inteiro mais próximo.
+            💡 <strong>Unidades convertidas:</strong> Kg → g, L → ml, Unidades mantidas como "un"
           </p>
         </div>
       )}

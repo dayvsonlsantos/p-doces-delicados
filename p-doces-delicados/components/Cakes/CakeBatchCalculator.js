@@ -5,6 +5,50 @@ import { useState, useEffect, useRef } from 'react'
 import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp, FaDownload } from 'react-icons/fa'
 import html2canvas from 'html2canvas'
 
+// Função para converter unidades
+const convertUnit = (value, fromUnit, toUnit) => {
+  if (fromUnit === toUnit) return value
+  
+  // Tabela de conversões
+  const conversions = {
+    'kg': { 'g': 1000, 'mg': 1000000 },
+    'g': { 'kg': 0.001, 'mg': 1000 },
+    'mg': { 'kg': 0.000001, 'g': 0.001 },
+    'l': { 'ml': 1000, 'cl': 100 },
+    'ml': { 'l': 0.001, 'cl': 0.1 },
+    'cl': { 'l': 0.01, 'ml': 10 },
+    'un': { 'un': 1 } // Unidade não converte
+  }
+  
+  return value * (conversions[fromUnit]?.[toUnit] || 1)
+}
+
+// Função para obter unidade de exibição base
+const getDisplayUnit = (unit) => {
+  const unitMap = {
+    'kg': 'g',
+    'g': 'g', 
+    'mg': 'g',
+    'l': 'ml',
+    'ml': 'ml',
+    'cl': 'ml',
+    'un': 'un'
+  }
+  return unitMap[unit] || unit
+}
+
+// Função para formatar quantidade baseada na unidade
+const formatQuantity = (value, unit) => {
+  const displayUnit = getDisplayUnit(unit)
+  const convertedValue = convertUnit(value, unit, displayUnit)
+  
+  if (displayUnit === 'un') {
+    return `${Math.ceil(convertedValue)} ${displayUnit}` // Unidades são inteiras
+  }
+  
+  return `${convertedValue.toFixed(2)}${displayUnit}`
+}
+
 export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, products }) {
   const [selectedCakes, setSelectedCakes] = useState({})
   const [calculations, setCalculations] = useState(null)
@@ -31,7 +75,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     }))
   }
 
-  // Função para calcular custo da massa/cobertura
+  // Função para calcular custo da massa/cobertura CORRIGIDA
   const calculateMassCost = (mass) => {
     let totalCost = 0
     mass.ingredients?.forEach(ingredient => {
@@ -41,11 +85,14 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         let cost = 0
 
         if (product.unit === 'un') {
-          const unitWeight = 50 // padrão 50g por unidade
+          // Para unidades, calcula quantas unidades são necessárias
+          const unitWeight = product.unitWeight || 50 // padrão 50g por unidade se não definido
           const units = ingredientGrams / unitWeight
           cost = units * product.unitCost
         } else {
-          cost = ingredientGrams * product.baseUnitCost
+          // Para outros, converte para a unidade base do produto
+          const convertedGrams = convertUnit(ingredientGrams, 'g', product.unit)
+          cost = convertedGrams * product.baseUnitCost
         }
 
         totalCost += cost
@@ -54,7 +101,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     return totalCost
   }
 
-  // Função para calcular custo de um bolo individual
+  // Função para calcular custo de um bolo individual CORRIGIDA
   const calculateCakeCost = (cake) => {
     let totalCost = 0
 
@@ -89,7 +136,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     return totalCost
   }
 
-  // Função para calcular ingredientes totais de uma massa
+  // Função para calcular ingredientes totais de uma massa CORRIGIDA
   const calculateMassIngredients = (mass, totalGrams) => {
     const scaleFactor = totalGrams / mass.totalGrams
     const ingredients = {}
@@ -98,10 +145,28 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       const product = products.find(p => p._id === ingredient.productId)
       if (product) {
         const scaledGrams = ingredient.grams * scaleFactor
-        if (scaledGrams >= 0.5) { // Só mostra se for pelo menos 0.5g
-          ingredients[product.name] = {
-            grams: Math.round(scaledGrams * 100) / 100, // Arredonda para 2 casas
-            product: product
+        
+        if (product.unit === 'un') {
+          // Para unidades, calcula quantas unidades inteiras são necessárias
+          const unitWeight = product.unitWeight || 50
+          const units = Math.ceil(scaledGrams / unitWeight) // Arredonda para cima para unidades
+          if (units > 0) {
+            ingredients[product.name] = {
+              quantity: units,
+              unit: 'un',
+              product: product
+            }
+          }
+        } else {
+          // Para outros, converte para a unidade apropriada
+          const displayUnit = getDisplayUnit(product.unit)
+          const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
+          if (convertedValue >= 0.5) { // Só mostra se for pelo menos 0.5 na unidade de display
+            ingredients[product.name] = {
+              quantity: Math.round(convertedValue * 100) / 100, // Arredonda para 2 casas
+              unit: displayUnit,
+              product: product
+            }
           }
         }
       }
@@ -110,7 +175,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     return ingredients
   }
 
-  // Função para calcular ingredientes totais de uma cobertura
+  // Função para calcular ingredientes totais de uma cobertura CORRIGIDA
   const calculateFrostingIngredients = (frosting, totalGrams) => {
     const scaleFactor = totalGrams / frosting.totalGrams
     const ingredients = {}
@@ -119,10 +184,28 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       const product = products.find(p => p._id === ingredient.productId)
       if (product) {
         const scaledGrams = ingredient.grams * scaleFactor
-        if (scaledGrams >= 0.5) { // Só mostra se for pelo menos 0.5g
-          ingredients[product.name] = {
-            grams: Math.round(scaledGrams * 100) / 100, // Arredonda para 2 casas
-            product: product
+        
+        if (product.unit === 'un') {
+          // Para unidades, calcula quantas unidades inteiras são necessárias
+          const unitWeight = product.unitWeight || 50
+          const units = Math.ceil(scaledGrams / unitWeight) // Arredonda para cima para unidades
+          if (units > 0) {
+            ingredients[product.name] = {
+              quantity: units,
+              unit: 'un',
+              product: product
+            }
+          }
+        } else {
+          // Para outros, converte para a unidade apropriada
+          const displayUnit = getDisplayUnit(product.unit)
+          const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
+          if (convertedValue >= 0.5) { // Só mostra se for pelo menos 0.5 na unidade de display
+            ingredients[product.name] = {
+              quantity: Math.round(convertedValue * 100) / 100, // Arredonda para 2 casas
+              unit: displayUnit,
+              product: product
+            }
           }
         }
       }
@@ -144,16 +227,13 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       if (quantity > 0) {
         const cake = cakes.find(c => c._id === cakeId)
         if (cake) {
-          // CORREÇÃO: Calcular custo unitário corretamente
           const cakeUnitCost = calculateCakeCost(cake) || 0
           const cakeTotalCost = cakeUnitCost * quantity
           
-          // Usar preço de venda definido ou calcular sugestão (3x o custo)
           const cakeSalePrice = cake.salePrice || (cakeUnitCost * 3)
           const cakeRevenue = cakeSalePrice * quantity
           const cakeProfit = cakeRevenue - cakeTotalCost
 
-          // CORREÇÃO: Garantir que todos os valores sejam números válidos
           cakeDetails.push({
             cake,
             quantity,
@@ -223,7 +303,6 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       }
     })
 
-    // CORREÇÃO: Garantir que os totais sejam números válidos
     setCalculations({
       cakeDetails,
       massGroups,
@@ -238,10 +317,8 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     if (!resultsRef.current) return
 
     try {
-      // Salvar estado atual das seções
       const originalExpandedState = { ...expandedSections }
       
-      // Expandir todas as seções temporariamente
       setExpandedSections({
         cakes: true,
         masses: true,
@@ -249,7 +326,6 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         summary: true
       })
 
-      // Aguardar o React atualizar a UI
       await new Promise(resolve => setTimeout(resolve, 100))
 
       const canvas = await html2canvas(resultsRef.current, {
@@ -264,7 +340,6 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       link.href = canvas.toDataURL('image/png')
       link.click()
 
-      // Restaurar estado original das seções
       setExpandedSections(originalExpandedState)
 
     } catch (error) {
@@ -335,7 +410,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
           <div className="space-y-3">
             {Object.entries(calculations.massGroups).map(([massName, massData]) => {
               const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
-              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
               return (
                 <div key={massName} className="p-3 rounded-lg bg-white/5">
@@ -364,7 +439,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {(data.grams || 0).toFixed(2)}g
+                              {data.unit === 'un' 
+                                ? `${data.quantity} ${data.unit}`
+                                : `${data.quantity}${data.unit}`
+                              }
                             </span>
                           </div>
                         ))}
@@ -391,7 +469,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
           <div className="space-y-3">
             {Object.entries(calculations.frostingGroups).map(([frostingName, frostingData]) => {
               const ingredients = calculateFrostingIngredients(frostingData.frosting, frostingData.totalGrams)
-              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+              const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
               return (
                 <div key={frostingName} className="p-3 rounded-lg bg-white/5">
@@ -420,7 +498,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {(data.grams || 0).toFixed(2)}g
+                              {data.unit === 'un' 
+                                ? `${data.quantity} ${data.unit}`
+                                : `${data.quantity}${data.unit}`
+                              }
                             </span>
                           </div>
                         ))}
@@ -438,11 +519,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         </div>
       )}
 
-      {/* Informação sobre arredondamento */}
+      {/* Informação sobre unidades */}
       <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
         <p className="text-blue-300 text-xs text-center">
-          💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g são considerados 0g, 
-          valores de 0.5g ou mais são arredondados para 2 casas decimais.
+          💡 <strong>Unidades convertidas:</strong> Kg → g, L → ml, Unidades mantidas como "un"
         </p>
       </div>
     </div>
@@ -610,7 +690,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
               <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
                 {Object.entries(calculations.massGroups).map(([massName, massData]) => {
                   const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
-                  const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+                  const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
                   return (
                     <div key={massName} className="p-4 rounded-xl bg-white/5">
@@ -641,7 +721,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                               <div key={productName} className="flex justify-between text-sm">
                                 <span className="text-white">{productName}</span>
                                 <span className="text-primary-300 font-semibold">
-                                  {(data.grams || 0).toFixed(2)}g
+                                  {data.unit === 'un' 
+                                    ? `${data.quantity} ${data.unit}`
+                                    : `${data.quantity}${data.unit}`
+                                  }
                                 </span>
                               </div>
                             ))}
@@ -673,7 +756,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
               <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
                 {Object.entries(calculations.frostingGroups).map(([frostingName, frostingData]) => {
                   const ingredients = calculateFrostingIngredients(frostingData.frosting, frostingData.totalGrams)
-                  const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.grams >= 0.5)
+                  const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
                   return (
                     <div key={frostingName} className="p-4 rounded-xl bg-white/5">
@@ -704,7 +787,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                               <div key={productName} className="flex justify-between text-sm">
                                 <span className="text-white">{productName}</span>
                                 <span className="text-primary-300 font-semibold">
-                                  {(data.grams || 0).toFixed(2)}g
+                                  {data.unit === 'un' 
+                                    ? `${data.quantity} ${data.unit}`
+                                    : `${data.quantity}${data.unit}`
+                                  }
                                 </span>
                               </div>
                             ))}
@@ -731,12 +817,11 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         )}
       </GlassCard>
 
-      {/* Informação sobre arredondamento */}
+      {/* Informação sobre unidades */}
       {calculations && (
         <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl col-span-full">
           <p className="text-blue-300 text-sm text-center">
-            💡 <strong>Arredondamento aplicado:</strong> Valores abaixo de 0.5g são considerados 0g, 
-            valores de 0.5g ou mais são arredondados para 2 casas decimais.
+            💡 <strong>Unidades convertidas:</strong> Kg → g, L → ml, Unidades mantidas como "un"
           </p>
         </div>
       )}

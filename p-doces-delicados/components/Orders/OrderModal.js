@@ -269,7 +269,8 @@ export default function OrderModal({
     setFormData(prev => ({
       ...prev,
       items: [...prev.items, {
-        itemType: selectedType === 'docinhos' ? 'candy' : 'cake',
+        itemType: formData.type === 'docinhos' ? 'candy' :
+          formData.type === 'bolos' ? 'cake' : 'candy', // CORREÇÃO: padrão para candy quando é ambos
         itemId: '',
         itemName: '',
         quantity: 1,
@@ -280,16 +281,12 @@ export default function OrderModal({
     }))
   }
 
-  const removeItem = (index) => {
-    const newItems = formData.items.filter((_, i) => i !== index)
-    setFormData(prev => ({ ...prev, items: newItems }))
-  }
-
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items]
     newItems[index][field] = value
 
     if (field === 'itemId') {
+      // CORREÇÃO: Buscar produto baseado no tipo do item
       if (newItems[index].itemType === 'candy') {
         const candy = candies.find(c => c._id === value)
         newItems[index].itemName = candy?.name || ''
@@ -309,6 +306,19 @@ export default function OrderModal({
 
     setFormData(prev => ({ ...prev, items: newItems }))
   }
+
+  // CORREÇÃO: Função para obter produtos disponíveis baseado no tipo
+  const getAvailableItems = (itemType) => {
+    if (itemType === 'candy') return candies
+    if (itemType === 'cake') return cakes
+    return [] // fallback
+  }
+
+  const removeItem = (index) => {
+    const newItems = formData.items.filter((_, i) => i !== index)
+    setFormData(prev => ({ ...prev, items: newItems }))
+  }
+
 
   // Funções para insumos
   const addSupply = () => {
@@ -728,6 +738,28 @@ export default function OrderModal({
                   </div>
 
                   <div className="space-y-3">
+                    {/* CORREÇÃO: Seletor de tipo do item (apenas quando tipo da encomenda é "ambos") */}
+                    {formData.type === 'ambos' && (
+                      <div>
+                        <label className="block text-white/60 text-xs mb-2">Tipo do Item</label>
+                        <select
+                          value={item.itemType}
+                          onChange={(e) => updateItem(index, 'itemType', e.target.value)}
+                          className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                          style={{
+                            WebkitAppearance: 'none',
+                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 1rem center',
+                            backgroundSize: '1em'
+                          }}
+                        >
+                          <option value="candy">Docinho</option>
+                          <option value="cake">Bolo</option>
+                        </select>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-white/60 text-xs mb-2">Produto</label>
                       <select
@@ -744,9 +776,10 @@ export default function OrderModal({
                         }}
                       >
                         <option value="">Selecione o produto</option>
-                        {availableItems && availableItems.map && availableItems.map(availableItem => (
-                          <option key={availableItem?._id || index} value={availableItem?._id}>
-                            {availableItem?.name} - R$ {availableItem?.salePrice?.toFixed(2) || '0.00'}
+                        {/* CORREÇÃO: Usar função getAvailableItems baseada no tipo do item */}
+                        {getAvailableItems(item.itemType).map(availableItem => (
+                          <option key={availableItem._id} value={availableItem._id}>
+                            {availableItem.name} - R$ {availableItem.salePrice?.toFixed(2) || '0.00'}
                           </option>
                         ))}
                       </select>
@@ -1164,13 +1197,13 @@ export default function OrderModal({
                           required
                           ref={endPaymentDateRef}
                         />
-                          <button
-                            type="button"
-                            onClick={() => endPaymentDateRef.current?.showPicker()}
-                            className="absolute right-3 text-white/40 hover:text-white/60 transition-colors z-10" /* Adicione z-index */
-                          >
-                            <FaCalendar />
-                          </button>
+                        <button
+                          type="button"
+                          onClick={() => endPaymentDateRef.current?.showPicker()}
+                          className="absolute right-3 text-white/40 hover:text-white/60 transition-colors z-10" /* Adicione z-index */
+                        >
+                          <FaCalendar />
+                        </button>
                       </div>
                     </div>
 
