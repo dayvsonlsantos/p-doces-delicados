@@ -1,7 +1,20 @@
-// components/Cakes/CakeList.js (atualizado com 2 casas decimais)
+// components/Cakes/CakeList.js (com margem de custo)
 import GlassButton from '../UI/GlassButton'
 import { FaEdit, FaTrash, FaBirthdayCake } from 'react-icons/fa'
 import { useState, useEffect } from 'react'
+
+// Função para calcular ambas as margens
+const calculateBothMargins = (cost, salePrice) => {
+  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+  
+  const costMargin = (cost / salePrice) * 100;
+  const profitMargin = 100 - costMargin;
+  
+  return {
+    costMargin: costMargin.toFixed(1),
+    profitMargin: profitMargin.toFixed(1)
+  };
+};
 
 export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, supplies, onEdit, onDelete }) {
   const [suppliesList, setSuppliesList] = useState([])
@@ -156,6 +169,10 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
         const hasSalePrice = cake.salePrice && parseFloat(cake.salePrice) > 0
         const totalGrams = (costBreakdown.massDetails.reduce((sum, m) => sum + m.grams, 0) + 
                           costBreakdown.frostingDetails.reduce((sum, f) => sum + f.grams, 0))
+        
+        // Calcular margens
+        const currentPrice = hasSalePrice ? parseFloat(cake.salePrice) : suggestedPrice
+        const margins = calculateBothMargins(costBreakdown.totalCost, currentPrice)
 
         return (
           <div key={cake._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
@@ -244,7 +261,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                       </div>
                     </div>
                     
-                    {/* Card de Preço */}
+                    {/* Card de Preço - ATUALIZADO COM MARGEM DE CUSTO */}
                     <div className="text-right w-full md:w-auto">
                       <div className={`border rounded-xl p-3 min-w-[140px] ${
                         hasSalePrice 
@@ -263,8 +280,12 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <div className="text-green-200 text-xs mt-1">
                               Lucro: R$ {(parseFloat(cake.salePrice) - costBreakdown.totalCost).toFixed(2)}
                             </div>
+                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
                             <div className="text-green-200 text-xs">
-                              {cake.profitMargin}% margem
+                              Lucro: {margins.profitMargin}%
+                            </div>
+                            <div className="text-orange-200 text-xs">
+                              Custo: {margins.costMargin}%
                             </div>
                           </>
                         ) : (
@@ -278,8 +299,12 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <div className="text-blue-200 text-xs mt-1">
                               Lucro: R$ {(suggestedPrice - costBreakdown.totalCost).toFixed(2)}
                             </div>
+                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
                             <div className="text-blue-200 text-xs">
-                              200% margem
+                              Lucro: {margins.profitMargin}%
+                            </div>
+                            <div className="text-orange-200 text-xs">
+                              Custo: {margins.costMargin}%
                             </div>
                             <div className="text-blue-300 text-xs mt-1 italic">
                               (3x o custo)

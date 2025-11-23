@@ -88,6 +88,18 @@ export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, c
     return totalCost
   }
 
+  const calculateBothMargins = (cost, salePrice) => {
+    if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+
+    const costMargin = (cost / salePrice) * 100;
+    const profitMargin = 100 - costMargin;
+
+    return {
+      costMargin: costMargin.toFixed(1),
+      profitMargin: profitMargin.toFixed(1)
+    };
+  };
+
   // Função para calcular custo do bolo - CORRIGIDA
   const calculateCakeCost = (cakeData) => {
     let totalCost = 0
@@ -386,7 +398,7 @@ export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, c
                         onChange={(e) => updateMass(index, 'massName', e.target.value)}
                         className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                         required
-                        style={{ 
+                        style={{
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                           backgroundRepeat: 'no-repeat',
@@ -463,7 +475,7 @@ export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, c
                         value={frosting.frostingName}
                         onChange={(e) => updateFrosting(index, 'frostingName', e.target.value)}
                         className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                        style={{ 
+                        style={{
                           WebkitAppearance: 'none',
                           backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                           backgroundRepeat: 'no-repeat',
@@ -537,7 +549,7 @@ export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, c
                       value={supplyId}
                       onChange={(e) => updateSupply(index, e.target.value)}
                       className="w-full glass-input h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                      style={{ 
+                      style={{
                         WebkitAppearance: 'none',
                         backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                         backgroundRepeat: 'no-repeat',
@@ -567,7 +579,7 @@ export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, c
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-white/60 text-xs mb-2">Margem de Lucro (%)</label>
+                <label className="block text-white/60 text-xs mb-2">Margem de Markup (%)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -654,8 +666,27 @@ export default function CakeModal({ isOpen, onClose, onSave, cake, cakeMasses, c
                         R$ {(parseFloat(formData.salePrice) - costBreakdown.totalCost).toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/80">Margem de lucro:</span>
+
+                    {/* NOVA SEÇÃO: MARGEM DE CUSTO E LUCRO */}
+                    {(() => {
+                      const margins = calculateBothMargins(costBreakdown.totalCost, parseFloat(formData.salePrice));
+                      return (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-white/80">Margem de Custo:</span>
+                            <span className="text-orange-400 font-semibold">{margins.costMargin}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/80">Margem de Lucro:</span>
+                            <span className="text-green-400 font-semibold">{margins.profitMargin}%</span>
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {/* Linha antiga (mantida para compatibilidade) */}
+                    <div className="flex justify-between border-t border-white/20 pt-2">
+                      <span className="text-white/80">Margem Markup:</span>
                       <span className="text-green-400 font-semibold">{formData.profitMargin}%</span>
                     </div>
                   </>

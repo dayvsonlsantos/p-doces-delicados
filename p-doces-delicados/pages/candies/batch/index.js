@@ -1,4 +1,4 @@
-// pages/batch.js - completo com unidades corrigidas
+// pages/batch.js - completo com unidades corrigidas e margem de lucro
 import Layout from '../../../components/Layout/Layout'
 import GlassCard from '../../../components/UI/GlassCard'
 import GlassButton from '../../../components/UI/GlassButton'
@@ -51,6 +51,19 @@ const formatQuantity = (value, unit) => {
 const roundGrams = (grams) => {
   return grams >= 0.5 ? Math.round(grams) : 0
 }
+
+// Função para calcular margem de lucro
+const calculateProfitMargin = (cost, salePrice) => {
+  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+  
+  const costMargin = (cost / salePrice) * 100;
+  const profitMargin = 100 - costMargin;
+  
+  return {
+    costMargin: costMargin.toFixed(1),
+    profitMargin: profitMargin.toFixed(1)
+  };
+};
 
 export default function BatchCalculator() {
   const [candies, setCandies] = useState([])
@@ -254,8 +267,8 @@ export default function BatchCalculator() {
         </div>
       </div>
 
-      {/* Resumo Financeiro */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      {/* Resumo Financeiro com Margem */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
         <div className="text-center">
           <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
           <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
@@ -268,6 +281,21 @@ export default function BatchCalculator() {
           <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
           <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
         </div>
+        <div className="text-center">
+          <p className="text-purple-300 text-xs font-semibold">Margem</p>
+          <p className="text-purple-400 text-lg font-bold">
+            {calculations.totalRevenue > 0 
+              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+              : '0'
+            }%
+          </p>
+          <p className="text-purple-300 text-xs">
+            Custo: {calculations.totalRevenue > 0 
+              ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+              : '0'
+            }%
+          </p>
+        </div>
       </div>
 
       {/* Docinhos do Lote - SEMPRE ABERTO no PNG */}
@@ -276,24 +304,31 @@ export default function BatchCalculator() {
           Docinhos do Lote ({calculations.candyDetails.length})
         </h4>
         <div className="space-y-2">
-          {calculations.candyDetails.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-              <div className="flex-1">
-                <span className="text-white font-medium text-sm">{item.candy.name}</span>
-                <div className="text-white/60 text-xs">
-                  {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+          {calculations.candyDetails.map((item, idx) => {
+            const marginInfo = calculateProfitMargin(item.candy.costPerUnit || 0, item.candy.salePrice || 0);
+            
+            return (
+              <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                <div className="flex-1">
+                  <span className="text-white font-medium text-sm">{item.candy.name}</span>
+                  <div className="text-white/60 text-xs">
+                    {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                  </div>
+                  <div className="text-xs text-purple-400 mt-1">
+                    Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-green-400 font-semibold text-sm">
+                    R$ {item.totalRevenue.toFixed(2)}
+                  </div>
+                  <div className="text-green-300 text-xs">
+                    Lucro: R$ {item.totalProfit.toFixed(2)}
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-green-400 font-semibold text-sm">
-                  R$ {item.totalRevenue.toFixed(2)}
-                </div>
-                <div className="text-green-300 text-xs">
-                  Lucro: R$ {item.totalProfit.toFixed(2)}
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -450,7 +485,7 @@ export default function BatchCalculator() {
 
           {calculations ? (
             <div className="space-y-4">
-              {/* Resumo Financeiro */}
+              {/* Resumo Financeiro com Margem */}
               <div
                 className="cursor-pointer"
                 onClick={() => toggleSection('summary')}
@@ -462,7 +497,7 @@ export default function BatchCalculator() {
               </div>
 
               {expandedSections.summary && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white/5 rounded-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white/5 rounded-2xl">
                   <div className="text-center">
                     <p className="text-orange-300 text-sm font-semibold">Custo Total</p>
                     <p className="text-orange-400 text-2xl font-bold">R$ {calculations.totalCost}</p>
@@ -476,6 +511,22 @@ export default function BatchCalculator() {
                   <div className="text-center">
                     <p className="text-green-300 text-sm font-semibold">Lucro Total</p>
                     <p className="text-green-400 text-2xl font-bold">R$ {calculations.totalProfit}</p>
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
+                    <p className="text-purple-400 text-2xl font-bold">
+                      {calculations.totalRevenue > 0 
+                        ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+                        : '0'
+                      }%
+                    </p>
+                    <p className="text-purple-300 text-xs">
+                      Custo: {calculations.totalRevenue > 0 
+                        ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+                        : '0'
+                      }%
+                    </p>
                   </div>
                 </div>
               )}
@@ -493,24 +544,31 @@ export default function BatchCalculator() {
 
               {expandedSections.candies && (
                 <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
-                  {calculations.candyDetails.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                      <div>
-                        <span className="text-primary font-semibold">{item.candy.name}</span>
-                        <div className="text-secondary text-xs">
-                          {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                  {calculations.candyDetails.map((item, idx) => {
+                    const marginInfo = calculateProfitMargin(item.candy.costPerUnit || 0, item.candy.salePrice || 0);
+                    
+                    return (
+                      <div key={idx} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
+                        <div>
+                          <span className="text-primary font-semibold">{item.candy.name}</span>
+                          <div className="text-secondary text-xs">
+                            {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                          </div>
+                          <div className="text-xs text-purple-400 mt-1">
+                            Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-green-400 font-semibold">
+                            R$ {item.totalRevenue.toFixed(2)}
+                          </div>
+                          <div className="text-green-300 text-xs">
+                            Lucro: R$ {item.totalProfit.toFixed(2)}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-green-400 font-semibold">
-                          R$ {item.totalRevenue.toFixed(2)}
-                        </div>
-                        <div className="text-green-300 text-xs">
-                          Lucro: R$ {item.totalProfit.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 

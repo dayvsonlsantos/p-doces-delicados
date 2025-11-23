@@ -45,6 +45,18 @@ const formatQuantity = (value, unit) => {
   return `${convertedValue.toFixed(2)}${displayUnit}`
 }
 
+// Função para calcular margem de lucro
+const calculateProfitMargin = (cost, salePrice) => {
+  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+  
+  const costMargin = (cost / salePrice) * 100;
+  const profitMargin = 100 - costMargin;
+  
+  return {
+    costMargin: costMargin.toFixed(1),
+    profitMargin: profitMargin.toFixed(1)
+  };
+};
 
 export default function CalculatorModal({
   isOpen,
@@ -52,7 +64,7 @@ export default function CalculatorModal({
   orders = [],
   candies = [],
   cakes = [],
-  masses = [], // Massas disponíveis (tanto para docinhos quanto bolos)
+  masses = [],
   cakeFrostings = [],
   products = []
 }) {
@@ -530,7 +542,7 @@ export default function CalculatorModal({
       const consolidatedIngredients = calculateConsolidatedIngredients(massGroups)
 
       setCalculations({
-        candyDetails,
+        candyDetails: candyDetails || [],
         massGroups,
         consolidatedIngredients,
         totalCost: totalCost.toFixed(2),
@@ -652,7 +664,7 @@ export default function CalculatorModal({
       })
 
       setCalculations({
-        cakeDetails,
+        cakeDetails: cakeDetails || [],
         massGroups,
         frostingGroups,
         consolidatedIngredients,
@@ -711,7 +723,8 @@ export default function CalculatorModal({
 
     return items
   }
-const toggleOrderExpansion = (orderId) => {
+
+  const toggleOrderExpansion = (orderId) => {
     setExpandedOrders(prev => ({
       ...prev,
       [orderId]: !prev[orderId]
@@ -798,6 +811,36 @@ const toggleOrderExpansion = (orderId) => {
     }
   }
 
+  // CORREÇÃO: Funções auxiliares para seleção em lote
+  const selectAllInOrder = (orderId) => {
+    const order = orders.find(o => o._id === orderId)
+    if (!order) return
+
+    const items = getOrderItems(order)
+    const newSelection = { ...selectedItems }
+
+    items.forEach(item => {
+      const itemKey = `${orderId}-${item.itemId}`
+      newSelection[itemKey] = {
+        ...item,
+        quantity: item.quantity,
+        product: item.product
+      }
+    })
+
+    setSelectedItems(newSelection)
+  }
+
+  const deselectAllInOrder = (orderId) => {
+    const newSelection = { ...selectedItems }
+    Object.keys(newSelection).forEach(key => {
+      if (key.startsWith(orderId)) {
+        delete newSelection[key]
+      }
+    })
+    setSelectedItems(newSelection)
+  }
+
   // Componente para renderizar os resultados expandidos (sempre aberto no PNG)
   const ResultsForPNG = () => (
     <div className="space-y-4 bg-gray-900 p-4 rounded-xl">
@@ -810,8 +853,8 @@ const toggleOrderExpansion = (orderId) => {
         </div>
       </div>
 
-      {/* Resumo Financeiro */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      {/* Resumo Financeiro com Margem */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
         <div className="text-center">
           <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
           <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
@@ -824,6 +867,21 @@ const toggleOrderExpansion = (orderId) => {
           <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
           <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
         </div>
+        <div className="text-center">
+          <p className="text-purple-300 text-xs font-semibold">Margem</p>
+          <p className="text-purple-400 text-lg font-bold">
+            {calculations.totalRevenue > 0 
+              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+              : '0'
+            }%
+          </p>
+          <p className="text-purple-300 text-xs">
+            Custo: {calculations.totalRevenue > 0 
+              ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+              : '0'
+            }%
+          </p>
+        </div>
       </div>
 
       {/* Conteúdo específico por tipo */}
@@ -833,27 +891,34 @@ const toggleOrderExpansion = (orderId) => {
           {/* Bolos do Lote */}
           <div>
             <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-              Bolos do Lote ({calculations.cakeDetails.length})
+              Bolos do Lote ({calculations.cakeDetails?.length || 0})
             </h4>
             <div className="space-y-2">
-              {calculations.cakeDetails.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                  <div className="flex-1">
-                    <span className="text-white font-medium text-sm">{item.cake.name}</span>
-                    <div className="text-white/60 text-xs">
-                      {item.quantity} un • R$ {item.unitCost.toFixed(2)}/un • {item.orderNumber}
+              {calculations.cakeDetails?.map((item, idx) => {
+                const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
+                
+                return (
+                  <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                    <div className="flex-1">
+                      <span className="text-white font-medium text-sm">{item.cake.name}</span>
+                      <div className="text-white/60 text-xs">
+                        {item.quantity} un • R$ {item.unitCost.toFixed(2)}/un • {item.orderNumber}
+                      </div>
+                      <div className="text-xs text-purple-400 mt-1">
+                        Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-green-400 font-semibold text-sm">
+                        R$ {item.revenue.toFixed(2)}
+                      </div>
+                      <div className="text-green-300 text-xs">
+                        Lucro: R$ {item.profit.toFixed(2)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-green-400 font-semibold text-sm">
-                      R$ {item.revenue.toFixed(2)}
-                    </div>
-                    <div className="text-green-300 text-xs">
-                      Lucro: R$ {item.profit.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -979,27 +1044,34 @@ const toggleOrderExpansion = (orderId) => {
           {/* Itens Selecionados */}
           <div>
             <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-              Itens Selecionados ({calculations.candyDetails.length})
+              Itens Selecionados ({calculations.candyDetails?.length || 0})
             </h4>
             <div className="space-y-2">
-              {calculations.candyDetails.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                  <div className="flex-1">
-                    <span className="text-white font-medium text-sm">{item.candy.name}</span>
-                    <div className="text-white/60 text-xs">
-                      {item.quantity} un • {item.orderNumber}
+              {calculations.candyDetails?.map((item, idx) => {
+                const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
+                
+                return (
+                  <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                    <div className="flex-1">
+                      <span className="text-white font-medium text-sm">{item.candy.name}</span>
+                      <div className="text-white/60 text-xs">
+                        {item.quantity} un • {item.orderNumber}
+                      </div>
+                      <div className="text-xs text-purple-400 mt-1">
+                        Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-green-400 font-semibold text-sm">
+                        R$ {item.totalRevenue.toFixed(2)}
+                      </div>
+                      <div className="text-green-300 text-xs">
+                        Lucro: R$ {item.totalProfit.toFixed(2)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-green-400 font-semibold text-sm">
-                      R$ {item.totalRevenue.toFixed(2)}
-                    </div>
-                    <div className="text-green-300 text-xs">
-                      Lucro: R$ {item.totalProfit.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -1396,8 +1468,8 @@ const toggleOrderExpansion = (orderId) => {
                   </div>
                 </div>
 
-                {/* Resumo Financeiro */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-blue-500/10 rounded-xl">
+                {/* Resumo Financeiro com Margem */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
                   <div className="text-center">
                     <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
                     <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
@@ -1409,6 +1481,21 @@ const toggleOrderExpansion = (orderId) => {
                   <div className="text-center">
                     <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
                     <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-purple-300 text-xs font-semibold">Margem</p>
+                    <p className="text-purple-400 text-lg font-bold">
+                      {calculations.totalRevenue > 0 
+                        ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+                        : '0'
+                      }%
+                    </p>
+                    <p className="text-purple-300 text-xs">
+                      Custo: {calculations.totalRevenue > 0 
+                        ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+                        : '0'
+                      }%
+                    </p>
                   </div>
                 </div>
 
@@ -1425,7 +1512,7 @@ const toggleOrderExpansion = (orderId) => {
                         <div className="flex items-center justify-between">
                           <h4 className="text-white font-semibold text-sm flex items-center gap-2">
                             <FaList className="w-4 h-4" />
-                            Bolos do Lote ({calculations.cakeDetails.length})
+                            Bolos do Lote ({calculations.cakeDetails?.length || 0})
                           </h4>
                           {expandedResults.items ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
                         </div>
@@ -1433,24 +1520,31 @@ const toggleOrderExpansion = (orderId) => {
 
                       {expandedResults.items && (
                         <div className="p-3 bg-white/3 space-y-2 max-h-40 overflow-y-auto">
-                          {calculations.cakeDetails.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                              <div className="flex-1">
-                                <span className="text-white font-medium text-sm">{item.cake.name}</span>
-                                <div className="text-white/60 text-xs">
-                                  {item.quantity} un • R$ {item.unitCost.toFixed(2)}/un • {item.orderNumber}
+                          {calculations.cakeDetails?.map((item, idx) => {
+                            const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
+                            
+                            return (
+                              <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                                <div className="flex-1">
+                                  <span className="text-white font-medium text-sm">{item.cake.name}</span>
+                                  <div className="text-white/60 text-xs">
+                                    {item.quantity} un • R$ {item.unitCost.toFixed(2)}/un • {item.orderNumber}
+                                  </div>
+                                  <div className="text-xs text-purple-400 mt-1">
+                                    Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-green-400 font-semibold text-sm">
+                                    R$ {item.revenue.toFixed(2)}
+                                  </div>
+                                  <div className="text-green-300 text-xs">
+                                    Lucro: R$ {item.profit.toFixed(2)}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-green-400 font-semibold text-sm">
-                                  R$ {item.revenue.toFixed(2)}
-                                </div>
-                                <div className="text-green-300 text-xs">
-                                  Lucro: R$ {item.profit.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -1619,7 +1713,7 @@ const toggleOrderExpansion = (orderId) => {
                         <div className="flex items-center justify-between">
                           <h4 className="text-white font-semibold text-sm flex items-center gap-2">
                             <FaList className="w-4 h-4" />
-                            Itens Selecionados ({calculations.candyDetails.length})
+                            Itens Selecionados ({calculations.candyDetails?.length || 0})
                           </h4>
                           {expandedResults.items ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
                         </div>
@@ -1627,24 +1721,31 @@ const toggleOrderExpansion = (orderId) => {
 
                       {expandedResults.items && (
                         <div className="p-3 bg-white/3 space-y-2 max-h-40 overflow-y-auto">
-                          {calculations.candyDetails.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                              <div className="flex-1">
-                                <span className="text-white font-medium text-sm">{item.candy.name}</span>
-                                <div className="text-white/60 text-xs">
-                                  {item.quantity} un • {item.orderNumber}
+                          {calculations.candyDetails?.map((item, idx) => {
+                            const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
+                            
+                            return (
+                              <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                                <div className="flex-1">
+                                  <span className="text-white font-medium text-sm">{item.candy.name}</span>
+                                  <div className="text-white/60 text-xs">
+                                    {item.quantity} un • {item.orderNumber}
+                                  </div>
+                                  <div className="text-xs text-purple-400 mt-1">
+                                    Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-green-400 font-semibold text-sm">
+                                    R$ {item.totalRevenue.toFixed(2)}
+                                  </div>
+                                  <div className="text-green-300 text-xs">
+                                    Lucro: R$ {item.totalProfit.toFixed(2)}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-green-400 font-semibold text-sm">
-                                  R$ {item.totalRevenue.toFixed(2)}
-                                </div>
-                                <div className="text-green-300 text-xs">
-                                  Lucro: R$ {item.totalProfit.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
                     </div>

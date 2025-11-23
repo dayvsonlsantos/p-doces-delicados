@@ -1,7 +1,20 @@
-// components/Candies/CandyList.js (atualizado com 2 casas decimais)
+// components/Candies/CandyList.js (com margem de custo)
 import { FaEdit, FaTrash, FaCookie } from 'react-icons/fa'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
+
+// Função para calcular ambas as margens
+const calculateBothMargins = (cost, salePrice) => {
+  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+  
+  const costMargin = (cost / salePrice) * 100;
+  const profitMargin = 100 - costMargin;
+  
+  return {
+    costMargin: costMargin.toFixed(1),
+    profitMargin: profitMargin.toFixed(1)
+  };
+};
 
 export default function CandyList({ candies, masses, products, onEdit, onDelete }) {
   const [supplies, setSupplies] = useState([])
@@ -154,6 +167,10 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
         const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
         const suggestedPrice = calculateSuggestedPrice(costBreakdown.totalCost)
         const hasSalePrice = candy.salePrice && parseFloat(candy.salePrice) > 0
+        
+        // Calcular margens
+        const currentPrice = hasSalePrice ? parseFloat(candy.salePrice) : suggestedPrice
+        const margins = calculateBothMargins(costBreakdown.totalCost, currentPrice)
 
         return (
           <div key={candy._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
@@ -216,7 +233,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                       </div>
                     </div>
                     
-                    {/* Card de Preço */}
+                    {/* Card de Preço - ATUALIZADO COM MARGEM DE CUSTO */}
                     <div className="text-right w-full md:w-auto">
                       <div className={`border rounded-xl p-3 min-w-[140px] ${
                         hasSalePrice 
@@ -235,8 +252,12 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                             <div className="text-green-200 text-xs mt-1">
                               Lucro: R$ {(parseFloat(candy.salePrice) - costBreakdown.totalCost).toFixed(2)}
                             </div>
+                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
                             <div className="text-green-200 text-xs">
-                              {candy.profitMargin}% margem
+                              Lucro: {margins.profitMargin}%
+                            </div>
+                            <div className="text-orange-200 text-xs">
+                              Custo: {margins.costMargin}%
                             </div>
                           </>
                         ) : (
@@ -250,8 +271,12 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                             <div className="text-blue-200 text-xs mt-1">
                               Lucro: R$ {(suggestedPrice - costBreakdown.totalCost).toFixed(2)}
                             </div>
+                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
                             <div className="text-blue-200 text-xs">
-                              200% margem
+                              Lucro: {margins.profitMargin}%
+                            </div>
+                            <div className="text-orange-200 text-xs">
+                              Custo: {margins.costMargin}%
                             </div>
                             <div className="text-blue-300 text-xs mt-1 italic">
                               (3x o custo)
