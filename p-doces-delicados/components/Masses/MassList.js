@@ -1,4 +1,4 @@
-import { FaEdit, FaTrash } from 'react-icons/fa'
+import { FaCalendar, FaEdit, FaSync, FaTrash } from 'react-icons/fa'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
 
@@ -18,6 +18,30 @@ const getUnitDescription = (unit, quantity = 1) => {
 
   return unitMap[unit.toLowerCase()] || unit
 }
+
+const formatUpdateDate = (date) => {
+  if (!date) return 'Nunca atualizado'
+  return new Date(date).toLocaleDateString('pt-BR')
+}
+
+// Função para calcular dias desde a última atualização
+const getDaysSinceUpdate = (updateDate) => {
+  if (!updateDate) return 999
+  const today = new Date()
+  const update = new Date(updateDate)
+  const diffTime = Math.abs(today - update)
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
+// Função para obter status da atualização
+const getUpdateStatus = (days) => {
+  if (days === 999) return { class: 'text-red-400', label: 'Desatualizado' }
+  if (days <= 7) return { class: 'text-green-400', label: 'Atualizado' }
+  if (days <= 30) return { class: 'text-yellow-400', label: 'Revisar' }
+  return { class: 'text-orange-400', label: 'Desatualizado' }
+}
+
+
 const getIngredientDisplay = (ingredient, products = []) => {
   if (!ingredient) return 'Ingrediente não definido'
 
@@ -178,6 +202,9 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
     <div className="space-y-4 md:space-y-6">
       {safeMasses.map((mass) => {
         const costData = calculateMassCost(mass)
+        const daysSinceUpdate = getDaysSinceUpdate(mass.updatedAt || mass.lastCostUpdate)
+        const updateStatus = getUpdateStatus(daysSinceUpdate)
+        const formattedUpdate = formatUpdateDate(mass.updatedAt)
 
         return (
           <div key={mass._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
@@ -187,15 +214,35 @@ export default function MassList({ masses, products, onEdit, onDelete }) {
                   <i className="fas fa-weight-scale text-sm md:text-base"></i>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-white text-base md:text-lg mb-1 truncate">
-                    {mass.name}
-                  </h3>
-                  <p className="text-white/60 text-xs md:text-sm">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 flex-wrap">
+                    <h3 className="font-semibold text-white text-base md:text-lg truncate">
+                      {mass.name}
+                    </h3>
+                    {/* Status de atualização */}
+                    <span className={`px-2 py-1 rounded-full text-xs ${updateStatus.class} bg-white/10 flex items-center gap-1`}>
+                      <FaSync className="w-3 h-3" />
+                      {updateStatus.label}
+                    </span>
+                  </div>
+
+                  <p className="text-white/60 text-xs md:text-sm mb-2">
                     Rendimento: {mass.totalGrams}g
                   </p>
 
+                  {/* Informações de data */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs md:text-sm mb-3">
+                    <div className="flex items-center gap-1 text-white/70">
+                      <FaCalendar className="w-3 h-3" />
+                      <span>Última atualização:</span>
+                      <span className="text-white">{formattedUpdate}</span>
+                    </div>
+                    <div className="text-white/60">
+                      {daysSinceUpdate !== 999 ? `Há ${daysSinceUpdate} dias` : 'Nunca atualizado'}
+                    </div>
+                  </div>
+
                   {/* Custo da massa */}
-                  <div className="mt-2 space-y-1">
+                  <div className="space-y-1">
                     <div className="flex justify-between text-xs md:text-sm">
                       <span className="text-white/70">Custo total:</span>
                       <span className="text-green-400 font-semibold">

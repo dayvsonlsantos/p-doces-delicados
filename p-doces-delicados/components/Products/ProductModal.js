@@ -12,7 +12,8 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
     quantity: '',
     cost: '',
     unitCost: '0.00',
-    baseUnitCost: '0.00' // Sempre em g ou ml
+    baseUnitCost: '0.00',
+    purchaseDate: new Date().toISOString().split('T')[0] // NOVO CAMPO
   })
 
   useEffect(() => {
@@ -23,26 +24,49 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
         quantity: product.quantity || '',
         cost: product.cost || '',
         unitCost: product.unitCost || '0.00',
-        baseUnitCost: product.baseUnitCost || '0.00'
+        baseUnitCost: product.baseUnitCost || '0.00',
+        purchaseDate: product.purchaseDate ? new Date(product.purchaseDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       })
     } else {
-      setFormData({ 
-        name: '', 
-        unit: 'g', 
+      setFormData({
+        name: '',
+        unit: 'g',
         quantity: '',
         cost: '',
         unitCost: '0.00',
-        baseUnitCost: '0.00'
+        baseUnitCost: '0.00',
+        purchaseDate: new Date().toISOString().split('T')[0] // Data atual como padrão
       })
     }
   }, [product, isOpen])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+
+    if (!formData.name || !formData.quantity || !formData.cost || !formData.purchaseDate) {
+      alert('Por favor, preencha todos os campos obrigatórios')
+      return
+    }
+
+    const productData = {
+      ...formData,
+      quantity: parseFloat(formData.quantity),
+      cost: parseFloat(formData.cost),
+      unitCost: parseFloat(formData.unitCost),
+      baseUnitCost: parseFloat(formData.baseUnitCost),
+      purchaseDate: new Date(formData.purchaseDate),
+      lastPurchaseCost: parseFloat(formData.cost) // Atualiza o último custo
+    }
+
+    onSave(productData)
+  }
 
   // Calcula o custo unitário automaticamente
   useEffect(() => {
     if (formData.quantity && formData.cost) {
       const quantity = parseFloat(formData.quantity)
       const cost = parseFloat(formData.cost)
-      
+
       if (quantity > 0 && cost > 0) {
         // Calcula o custo na unidade original
         const unitCost = cost / quantity
@@ -116,25 +140,6 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
     }
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    
-    if (!formData.name || !formData.quantity || !formData.cost) {
-      alert('Por favor, preencha todos os campos obrigatórios')
-      return
-    }
-
-    const productData = {
-      ...formData,
-      quantity: parseFloat(formData.quantity),
-      cost: parseFloat(formData.cost),
-      unitCost: parseFloat(formData.unitCost),
-      baseUnitCost: parseFloat(formData.baseUnitCost)
-    }
-    
-    onSave(productData)
-  }
-
   if (!isOpen) return null
 
   const conversionInfo = getConversionInfo()
@@ -152,6 +157,14 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           placeholder="Ex: Leite Condensado"
+          required
+        />
+
+        <Input
+          label="Data da Compra"
+          type="date"
+          value={formData.purchaseDate}
+          onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
           required
         />
 
@@ -239,9 +252,9 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
             Como funciona?
           </h4>
           <p className="text-green-200 text-sm">
-            <strong>Exemplos:</strong><br/>
-            • 1kg por R$ 10,00 = R$ 0,010000 por grama<br/>
-            • 1L por R$ 8,00 = R$ 0,008000 por ml<br/>
+            <strong>Exemplos:</strong><br />
+            • 1kg por R$ 10,00 = R$ 0,010000 por grama<br />
+            • 1L por R$ 8,00 = R$ 0,008000 por ml<br />
             • 100un por R$ 15,00 = R$ 0,1500 por unidade
           </p>
         </div>

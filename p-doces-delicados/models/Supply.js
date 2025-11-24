@@ -1,11 +1,13 @@
 const Supply = {
   _id: ObjectId,
   name: "Papel de Docinho",
-  category: "papel", // papel, embalagem, decoracao, utensilio, outro
-  cost: 0.05, // Custo por unidade
-  unit: "un", // Sempre unidade
-  unitCost: 0.05, // Igual ao cost
-  baseUnitCost: 0.05, // Igual ao cost
+  category: "papel",
+  cost: 0.05,
+  unit: "un",
+  unitCost: 0.05,
+  baseUnitCost: 0.05,
+  purchaseDate: Date, // NOVO CAMPO
+  lastPurchaseCost: 0.05, // NOVO CAMPO
   description: "Papel branco para docinhos",
   createdAt: Date,
   updatedAt: Date

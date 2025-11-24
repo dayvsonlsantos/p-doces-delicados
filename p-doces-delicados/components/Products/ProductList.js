@@ -14,6 +14,23 @@ export default function ProductList({ products, onEdit, onDelete }) {
     }
   }
 
+  const getDaysSincePurchase = (purchaseDate) => {
+    if (!purchaseDate) return 'N/A'
+    const today = new Date()
+    const purchase = new Date(purchaseDate)
+    const diffTime = Math.abs(today - purchase)
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  const getPurchaseStatus = (days) => {
+    if (days === 'N/A') return 'text-gray-400'
+    if (days <= 30) return 'text-green-400'
+    if (days <= 90) return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+
   const getBaseCostInfo = (product) => {
     if (product.unit === 'un') {
       return `R$ ${product.unitCost?.toFixed(4)}/un`
@@ -35,78 +52,94 @@ export default function ProductList({ products, onEdit, onDelete }) {
 
   return (
     <div className="space-y-3 md:space-y-4">
-      {products.map((product) => (
-        <div key={product._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors">
-          <div className="flex items-start justify-between flex-col md:flex-row gap-4">
-            <div className="flex items-start gap-3 md:gap-4 flex-1 w-full">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-green-500 flex items-center justify-center text-white flex-shrink-0">
-                <FaBox size={16} className="md:w-5 md:h-5" />
-              </div>
-              
-              <div className="flex-1 min-w-0"> {/* min-w-0 para truncate funcionar */}
-                <div className="flex items-center gap-2 md:gap-3 mb-2 flex-wrap">
-                  <h3 className="font-semibold text-primary text-base md:text-lg truncate">
-                    {product.name}
-                  </h3>
-                  <span className="px-2 py-1 bg-white/10 rounded-full text-xs text-secondary capitalize flex-shrink-0">
-                    {product.unit}
-                  </span>
+      {products.map((product) => {
+        const daysSincePurchase = getDaysSincePurchase(product.purchaseDate)
+        const statusClass = getPurchaseStatus(daysSincePurchase)
+
+        return (
+          <div key={product._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors">
+            <div className="flex items-start justify-between flex-col md:flex-row gap-4">
+              <div className="flex items-start gap-3 md:gap-4 flex-1 w-full">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-green-500 flex items-center justify-center text-white flex-shrink-0">
+                  <FaBox size={16} className="md:w-5 md:h-5" />
                 </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-sm">
-                  <div className="min-w-0">
-                    <p className="text-secondary text-xs md:text-sm">Embalagem:</p>
-                    <p className="text-primary font-semibold text-sm md:text-base truncate">
-                      {getUnitDisplay(product)}
-                    </p>
-                  </div>
-                  
-                  <div className="min-w-0">
-                    <p className="text-secondary text-xs md:text-sm">Custo total:</p>
-                    <p className="text-primary font-semibold text-sm md:text-base">
-                      R$ {product.cost?.toFixed(2)}
-                    </p>
-                  </div>
-                  
-                  <div className="min-w-0">
-                    <p className="text-secondary text-xs md:text-sm">Custo unitário:</p>
-                    <p className="text-green-400 font-semibold text-xs md:text-sm">
-                      R$ {product.unitCost?.toFixed(4)}/{product.unit}
-                    </p>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 flex-wrap">
+                    <h3 className="font-semibold text-primary text-base md:text-lg truncate">
+                      {product.name}
+                    </h3>
+                    <span className="px-2 py-1 bg-white/10 rounded-full text-xs text-secondary capitalize flex-shrink-0">
+                      {product.unit}
+                    </span>
+                    {/* NOVO: Status da compra */}
+                    <span className={`px-2 py-1 rounded-full text-xs ${statusClass} bg-white/10 flex-shrink-0`}>
+                      {daysSincePurchase === 'N/A' ? 'N/A' : `${daysSincePurchase}d`}
+                    </span>
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="text-secondary text-xs md:text-sm flex items-center gap-1">
-                      <FaExchangeAlt size={10} />
-                      Custo base:
-                    </p>
-                    <p className="text-blue-400 font-semibold text-xs truncate">
-                      {getBaseCostInfo(product)}
-                    </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-sm">
+                    <div className="min-w-0">
+                      <p className="text-secondary text-xs md:text-sm">Embalagem:</p>
+                      <p className="text-primary font-semibold text-sm md:text-base truncate">
+                        {getUnitDisplay(product)}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-secondary text-xs md:text-sm">Custo total:</p>
+                      <p className="text-primary font-semibold text-sm md:text-base">
+                        R$ {product.cost?.toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-secondary text-xs md:text-sm">Custo unitário:</p>
+                      <p className="text-green-400 font-semibold text-xs md:text-sm">
+                        R$ {product.unitCost?.toFixed(4)}/{product.unit}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-secondary text-xs md:text-sm flex items-center gap-1">
+                        <FaExchangeAlt size={10} />
+                        Custo base:
+                      </p>
+                      <p className="text-blue-400 font-semibold text-xs truncate">
+                        {getBaseCostInfo(product)}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-secondary text-xs md:text-sm">Comprado em:</p>
+                      <p className="text-primary font-semibold text-sm md:text-base">
+                        {product.purchaseDate ? new Date(product.purchaseDate).toLocaleDateString('pt-BR') : 'N/A'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <GlassButton
-                variant="secondary"
-                onClick={() => onEdit(product)}
-                className="px-3 py-2 text-xs md:text-sm"
-              >
-                <FaEdit size={12} className="md:w-3 md:h-3" />
-              </GlassButton>
-              <GlassButton
-                variant="danger"
-                onClick={() => onDelete(product._id)}
-                className="px-3 py-2 text-xs md:text-sm"
-              >
-                <FaTrash size={12} className="md:w-3 md:h-3" />
-              </GlassButton>
+
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                <GlassButton
+                  variant="secondary"
+                  onClick={() => onEdit(product)}
+                  className="px-3 py-2 text-xs md:text-sm"
+                >
+                  <FaEdit size={12} className="md:w-3 md:h-3" />
+                </GlassButton>
+                <GlassButton
+                  variant="danger"
+                  onClick={() => onDelete(product._id)}
+                  className="px-3 py-2 text-xs md:text-sm"
+                >
+                  <FaTrash size={12} className="md:w-3 md:h-3" />
+                </GlassButton>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

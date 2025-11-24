@@ -9,7 +9,8 @@ export default function SupplyModal({ isOpen, onClose, onSave, supply }) {
   const [formData, setFormData] = useState({
     name: '',
     cost: '',
-    description: ''
+    description: '',
+    purchaseDate: new Date().toISOString().split('T')[0] // NOVO CAMPO
   })
 
   useEffect(() => {
@@ -17,30 +18,34 @@ export default function SupplyModal({ isOpen, onClose, onSave, supply }) {
       setFormData({
         name: supply.name || '',
         cost: supply.cost || '',
-        description: supply.description || ''
+        description: supply.description || '',
+        purchaseDate: supply.purchaseDate ? new Date(supply.purchaseDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       })
     } else {
-      setFormData({ 
-        name: '', 
+      setFormData({
+        name: '',
         cost: '',
-        description: ''
+        description: '',
+        purchaseDate: new Date().toISOString().split('T')[0]
       })
     }
   }, [supply, isOpen])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
-    if (!formData.name || !formData.cost) {
-      alert('Por favor, preencha o nome e o custo do insumo')
+
+    if (!formData.name || !formData.cost || !formData.purchaseDate) {
+      alert('Por favor, preencha o nome, custo e data da compra')
       return
     }
 
     const supplyData = {
       ...formData,
-      cost: parseFloat(formData.cost)
+      cost: parseFloat(formData.cost),
+      purchaseDate: new Date(formData.purchaseDate),
+      lastPurchaseCost: parseFloat(formData.cost)
     }
-    
+
     onSave(supplyData)
   }
 
@@ -70,6 +75,14 @@ export default function SupplyModal({ isOpen, onClose, onSave, supply }) {
           value={formData.cost}
           onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
           placeholder="0.00"
+          required
+        />
+
+        <Input
+          label="Data da Compra"
+          type="date"
+          value={formData.purchaseDate}
+          onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
           required
         />
 

@@ -6,10 +6,10 @@ import { useState, useEffect } from 'react'
 // Função para calcular ambas as margens
 const calculateBothMargins = (cost, salePrice) => {
   if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
-  
+
   const costMargin = (cost / salePrice) * 100;
   const profitMargin = 100 - costMargin;
-  
+
   return {
     costMargin: costMargin.toFixed(1),
     profitMargin: profitMargin.toFixed(1)
@@ -31,6 +31,26 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
     } catch (error) {
       console.error('Erro ao carregar insumos:', error)
     }
+  }
+
+  const formatUpdateDate = (date) => {
+    if (!date) return 'Nunca atualizado'
+    return new Date(date).toLocaleDateString('pt-BR')
+  }
+
+  const getDaysSinceUpdate = (updateDate) => {
+    if (!updateDate) return 999
+    const today = new Date()
+    const update = new Date(updateDate)
+    const diffTime = Math.abs(today - update)
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  const getUpdateStatus = (days) => {
+    if (days === 999) return { class: 'text-red-400', label: 'Desatualizado' }
+    if (days <= 7) return { class: 'text-green-400', label: 'Atualizado' }
+    if (days <= 30) return { class: 'text-yellow-400', label: 'Revisar' }
+    return { class: 'text-orange-400', label: 'Desatualizado' }
   }
 
   // CORREÇÃO: Usar a mesma lógica de cálculo que está na página de massas
@@ -78,7 +98,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
           const massCostPerGram = massTotalCost / mass.totalGrams
           const massGrams = parseFloat(massItem.grams)
           const massCost = massCostPerGram * massGrams
-          
+
           costBreakdown.massCost += massCost
           totalCost += massCost
           costBreakdown.massDetails.push({
@@ -102,7 +122,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
           const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
           const frostingGrams = parseFloat(frostingItem.grams)
           const frostingCost = frostingCostPerGram * frostingGrams
-          
+
           costBreakdown.frostingCost += frostingCost
           totalCost += frostingCost
           costBreakdown.frostingDetails.push({
@@ -167,12 +187,13 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
         const costBreakdown = calculateCakeCost(cake)
         const suggestedPrice = calculateSuggestedPrice(costBreakdown.totalCost)
         const hasSalePrice = cake.salePrice && parseFloat(cake.salePrice) > 0
-        const totalGrams = (costBreakdown.massDetails.reduce((sum, m) => sum + m.grams, 0) + 
-                          costBreakdown.frostingDetails.reduce((sum, f) => sum + f.grams, 0))
-        
-        // Calcular margens
-        const currentPrice = hasSalePrice ? parseFloat(cake.salePrice) : suggestedPrice
-        const margins = calculateBothMargins(costBreakdown.totalCost, currentPrice)
+        const totalGrams = (costBreakdown.massDetails.reduce((sum, m) => sum + m.grams, 0) +
+          costBreakdown.frostingDetails.reduce((sum, f) => sum + f.grams, 0))
+
+        // Datas
+        const daysSinceUpdate = getDaysSinceUpdate(cake.updatedAt)
+        const updateStatus = getUpdateStatus(daysSinceUpdate)
+        const formattedUpdate = formatUpdateDate(cake.updatedAt)
 
         return (
           <div key={cake._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
@@ -181,24 +202,43 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 flex items-center justify-center text-white flex-shrink-0">
                   <FaBirthdayCake className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between flex-col md:flex-row gap-3 md:gap-0">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white text-base md:text-lg mb-2 truncate">
-                        {cake.name}
-                      </h3>
-                      
+                      {/* Header com status de atualização */}
+                      <div className="flex items-center gap-2 md:gap-3 mb-2 flex-wrap">
+                        <h3 className="font-semibold text-white text-base md:text-lg truncate">
+                          {cake.name}
+                        </h3>
+                        <span className={`px-2 py-1 rounded-full text-xs ${updateStatus.class} bg-white/10 flex items-center gap-1`}>
+                          <FaSync className="w-3 h-3" />
+                          {updateStatus.label}
+                        </span>
+                      </div>
+
                       {cake.description && (
                         <p className="text-white/60 text-xs md:text-sm mb-3 line-clamp-2">{cake.description}</p>
                       )}
-                      
+
+                      {/* Informações de data */}
+                      <div className="flex flex-wrap items-center gap-4 text-xs md:text-sm mb-3">
+                        <div className="flex items-center gap-1 text-white/70">
+                          <FaCalendar className="w-3 h-3" />
+                          <span>Última atualização:</span>
+                          <span className="text-white">{formattedUpdate}</span>
+                        </div>
+                        <div className="text-white/60">
+                          {daysSinceUpdate !== 999 ? `Há ${daysSinceUpdate} dias` : 'Nunca atualizado'}
+                        </div>
+                      </div>
+
                       {/* Informações das Massas e Coberturas */}
                       <div className="mb-3">
                         <p className="text-white/60 text-xs md:text-sm mb-2">
                           {costBreakdown.massDetails.length} massa(s) • {costBreakdown.frostingDetails.length} cobertura(s) • {totalGrams.toFixed(2)}g total
                         </p>
-                        
+
                         {/* Massas */}
                         {costBreakdown.massDetails.length > 0 && (
                           <div className="mb-2">
@@ -235,7 +275,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <span className="text-blue-400">R$ {costBreakdown.massCost.toFixed(2)}</span>
                           </div>
                         )}
-                        
+
                         {/* Coberturas */}
                         {costBreakdown.frostingCost > 0 && (
                           <div className="flex justify-between">
@@ -243,7 +283,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <span className="text-pink-400">R$ {costBreakdown.frostingCost.toFixed(2)}</span>
                           </div>
                         )}
-                        
+
                         {/* Insumos */}
                         {costBreakdown.suppliesCost > 0 && (
                           <div className="flex justify-between">
@@ -251,7 +291,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <span className="text-purple-400">R$ {costBreakdown.suppliesCost.toFixed(2)}</span>
                           </div>
                         )}
-                        
+
                         <div className="flex justify-between border-t border-white/20 pt-1">
                           <span className="text-white font-semibold">Custo total:</span>
                           <span className="text-primary-300 font-bold">
@@ -260,15 +300,14 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Card de Preço - ATUALIZADO COM MARGEM DE CUSTO */}
                     <div className="text-right w-full md:w-auto">
-                      <div className={`border rounded-xl p-3 min-w-[140px] ${
-                        hasSalePrice 
-                          ? 'bg-green-500/10 border-green-500/20' 
-                          : 'bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        
+                      <div className={`border rounded-xl p-3 min-w-[140px] ${hasSalePrice
+                        ? 'bg-green-500/10 border-green-500/20'
+                        : 'bg-blue-500/10 border-blue-500/20'
+                        }`}>
+
                         {hasSalePrice ? (
                           <>
                             <div className="text-green-400 font-bold text-base md:text-lg">
@@ -312,7 +351,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                           </>
                         )}
                       </div>
-                      
+
                       {/* Botão para definir preço */}
                       {!hasSalePrice && (
                         <button
