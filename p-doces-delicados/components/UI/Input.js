@@ -12,7 +12,7 @@ export default function Input({
   return (
     <div className={`space-y-2 ${className}`}>
       {label && (
-        <label className="block text-sm font-medium text-primary">
+        <label className="block text-sm font-medium text-primary flex">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}

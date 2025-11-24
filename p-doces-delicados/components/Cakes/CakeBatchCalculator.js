@@ -1,15 +1,14 @@
-// components/Cakes/CakeBatchCalculator.js (completo com margem de lucro)
+// components/Cakes/CakeBatchCalculator.js (completo com custo fixo corrigido)
 import GlassCard from '../UI/GlassCard'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect, useRef } from 'react'
-import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp, FaDownload } from 'react-icons/fa'
+import { FaCalculator, FaPlus, FaMinus, FaChevronDown, FaChevronUp, FaDownload, FaClock } from 'react-icons/fa'
 import html2canvas from 'html2canvas'
 
 // Função para converter unidades
 const convertUnit = (value, fromUnit, toUnit) => {
   if (fromUnit === toUnit) return value
-  
-  // Tabela de conversões
+
   const conversions = {
     'kg': { 'g': 1000, 'mg': 1000000 },
     'g': { 'kg': 0.001, 'mg': 1000 },
@@ -17,9 +16,9 @@ const convertUnit = (value, fromUnit, toUnit) => {
     'l': { 'ml': 1000, 'cl': 100 },
     'ml': { 'l': 0.001, 'cl': 0.1 },
     'cl': { 'l': 0.01, 'ml': 10 },
-    'un': { 'un': 1 } // Unidade não converte
+    'un': { 'un': 1 }
   }
-  
+
   return value * (conversions[fromUnit]?.[toUnit] || 1)
 }
 
@@ -27,7 +26,7 @@ const convertUnit = (value, fromUnit, toUnit) => {
 const getDisplayUnit = (unit) => {
   const unitMap = {
     'kg': 'g',
-    'g': 'g', 
+    'g': 'g',
     'mg': 'g',
     'l': 'ml',
     'ml': 'ml',
@@ -41,21 +40,21 @@ const getDisplayUnit = (unit) => {
 const formatQuantity = (value, unit) => {
   const displayUnit = getDisplayUnit(unit)
   const convertedValue = convertUnit(value, unit, displayUnit)
-  
+
   if (displayUnit === 'un') {
-    return `${Math.ceil(convertedValue)} ${displayUnit}` // Unidades são inteiras
+    return `${Math.ceil(convertedValue)} ${displayUnit}`
   }
-  
+
   return `${convertedValue.toFixed(2)}${displayUnit}`
 }
 
 // Função para calcular margem de lucro
-const calculateProfitMargin = (cost, salePrice) => {
-  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
-  
-  const costMargin = (cost / salePrice) * 100;
+const calculateProfitMargin = (totalCost, salePrice) => {
+  if (totalCost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+
+  const costMargin = (totalCost / salePrice) * 100;
   const profitMargin = 100 - costMargin;
-  
+
   return {
     costMargin: costMargin.toFixed(1),
     profitMargin: profitMargin.toFixed(1)
@@ -71,8 +70,27 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     frostings: false,
     summary: false
   })
-  
+  const [fixedCosts, setFixedCosts] = useState([])
+  const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
+
   const resultsRef = useRef(null)
+
+  useEffect(() => {
+    loadFixedCosts()
+  }, [])
+
+  const loadFixedCosts = async () => {
+    try {
+      const response = await fetch('/api/fixed-costs')
+      const data = await response.json()
+      setFixedCosts(data)
+
+      const total = data.reduce((sum, cost) => sum + (parseFloat(cost.costPerMinute) || 0), 0)
+      setTotalCostPerMinute(total)
+    } catch (error) {
+      console.error('Erro ao carregar custos fixos:', error)
+    }
+  }
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -88,7 +106,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     }))
   }
 
-  // Função para calcular custo da massa/cobertura CORRIGIDA
+  // Função para calcular custo da massa/cobertura
   const calculateMassCost = (mass) => {
     let totalCost = 0
     mass.ingredients?.forEach(ingredient => {
@@ -98,12 +116,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         let cost = 0
 
         if (product.unit === 'un') {
-          // Para unidades, calcula quantas unidades são necessárias
-          const unitWeight = product.unitWeight || 50 // padrão 50g por unidade se não definido
+          const unitWeight = product.unitWeight || 50
           const units = ingredientGrams / unitWeight
           cost = units * product.unitCost
         } else {
-          // Para outros, converte para a unidade base do produto
           const convertedGrams = convertUnit(ingredientGrams, 'g', product.unit)
           cost = convertedGrams * product.baseUnitCost
         }
@@ -114,9 +130,17 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     return totalCost
   }
 
-  // Função para calcular custo de um bolo individual CORRIGIDA
+  // CORREÇÃO: Função para calcular custo com tempo
+  const calculateTimeCost = (cake) => {
+    if (!cake.preparationTime || totalCostPerMinute === 0) return 0
+    
+    const preparationTime = parseFloat(cake.preparationTime) || 0
+    return totalCostPerMinute * preparationTime
+  }
+
+  // CORREÇÃO: Função para calcular custo do bolo
   const calculateCakeCost = (cake) => {
-    let totalCost = 0
+    let materialCost = 0
 
     // Cálculo das massas
     if (cake.masses) {
@@ -127,7 +151,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
           const massCostPerGram = massTotalCost / mass.totalGrams
           const massGrams = parseFloat(massItem.grams)
           const massCost = massCostPerGram * massGrams
-          totalCost += massCost
+          materialCost += massCost
         }
       })
     }
@@ -141,15 +165,22 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
           const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
           const frostingGrams = parseFloat(frostingItem.grams)
           const frostingCost = frostingCostPerGram * frostingGrams
-          totalCost += frostingCost
+          materialCost += frostingCost
         }
       })
     }
 
-    return totalCost
+    // Calcular custo com tempo
+    const timeCost = calculateTimeCost(cake)
+
+    return {
+      materialCost,
+      timeCost,
+      totalCost: materialCost + timeCost
+    }
   }
 
-  // Função para calcular ingredientes totais de uma massa CORRIGIDA
+  // Função para calcular ingredientes totais de uma massa
   const calculateMassIngredients = (mass, totalGrams) => {
     const scaleFactor = totalGrams / mass.totalGrams
     const ingredients = {}
@@ -158,11 +189,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       const product = products.find(p => p._id === ingredient.productId)
       if (product) {
         const scaledGrams = ingredient.grams * scaleFactor
-        
+
         if (product.unit === 'un') {
-          // Para unidades, calcula quantas unidades inteiras são necessárias
           const unitWeight = product.unitWeight || 50
-          const units = Math.ceil(scaledGrams / unitWeight) // Arredonda para cima para unidades
+          const units = Math.ceil(scaledGrams / unitWeight)
           if (units > 0) {
             ingredients[product.name] = {
               quantity: units,
@@ -171,12 +201,11 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
             }
           }
         } else {
-          // Para outros, converte para a unidade apropriada
           const displayUnit = getDisplayUnit(product.unit)
           const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
-          if (convertedValue >= 0.5) { // Só mostra se for pelo menos 0.5 na unidade de display
+          if (convertedValue >= 0.5) {
             ingredients[product.name] = {
-              quantity: Math.round(convertedValue * 100) / 100, // Arredonda para 2 casas
+              quantity: Math.round(convertedValue * 100) / 100,
               unit: displayUnit,
               product: product
             }
@@ -188,7 +217,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     return ingredients
   }
 
-  // Função para calcular ingredientes totais de uma cobertura CORRIGIDA
+  // Função para calcular ingredientes totais de uma cobertura
   const calculateFrostingIngredients = (frosting, totalGrams) => {
     const scaleFactor = totalGrams / frosting.totalGrams
     const ingredients = {}
@@ -197,11 +226,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       const product = products.find(p => p._id === ingredient.productId)
       if (product) {
         const scaledGrams = ingredient.grams * scaleFactor
-        
+
         if (product.unit === 'un') {
-          // Para unidades, calcula quantas unidades inteiras são necessárias
           const unitWeight = product.unitWeight || 50
-          const units = Math.ceil(scaledGrams / unitWeight) // Arredonda para cima para unidades
+          const units = Math.ceil(scaledGrams / unitWeight)
           if (units > 0) {
             ingredients[product.name] = {
               quantity: units,
@@ -210,12 +238,11 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
             }
           }
         } else {
-          // Para outros, converte para a unidade apropriada
           const displayUnit = getDisplayUnit(product.unit)
           const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
-          if (convertedValue >= 0.5) { // Só mostra se for pelo menos 0.5 na unidade de display
+          if (convertedValue >= 0.5) {
             ingredients[product.name] = {
-              quantity: Math.round(convertedValue * 100) / 100, // Arredonda para 2 casas
+              quantity: Math.round(convertedValue * 100) / 100,
               unit: displayUnit,
               product: product
             }
@@ -231,6 +258,8 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     const cakeDetails = []
     const massGroups = {}
     const frostingGroups = {}
+    let totalMaterialCost = 0
+    let totalTimeCost = 0
     let totalCost = 0
     let totalRevenue = 0
     let totalProfit = 0
@@ -240,9 +269,12 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       if (quantity > 0) {
         const cake = cakes.find(c => c._id === cakeId)
         if (cake) {
-          const cakeUnitCost = calculateCakeCost(cake) || 0
+          const costBreakdown = calculateCakeCost(cake)
+          const cakeUnitCost = costBreakdown.totalCost
           const cakeTotalCost = cakeUnitCost * quantity
-          
+          const cakeMaterialCost = costBreakdown.materialCost * quantity
+          const cakeTimeCost = costBreakdown.timeCost // CORREÇÃO: Multiplicar por quantidade
+
           const cakeSalePrice = cake.salePrice || (cakeUnitCost * 3)
           const cakeRevenue = cakeSalePrice * quantity
           const cakeProfit = cakeRevenue - cakeTotalCost
@@ -251,12 +283,16 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
             cake,
             quantity,
             unitCost: cakeUnitCost,
+            materialCost: cakeMaterialCost,
+            timeCost: cakeTimeCost,
             totalCost: cakeTotalCost,
             salePrice: cakeSalePrice,
             revenue: cakeRevenue,
             profit: cakeProfit
           })
 
+          totalMaterialCost += cakeMaterialCost
+          totalTimeCost += cakeTimeCost
           totalCost += cakeTotalCost
           totalRevenue += cakeRevenue
           totalProfit += cakeProfit
@@ -320,6 +356,8 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
       cakeDetails,
       massGroups,
       frostingGroups,
+      totalMaterialCost: (totalMaterialCost || 0).toFixed(2),
+      totalTimeCost: (totalTimeCost || 0).toFixed(2),
       totalCost: (totalCost || 0).toFixed(2),
       totalRevenue: (totalRevenue || 0).toFixed(2),
       totalProfit: (totalProfit || 0).toFixed(2)
@@ -331,7 +369,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
     try {
       const originalExpandedState = { ...expandedSections }
-      
+
       setExpandedSections({
         cakes: true,
         masses: true,
@@ -361,7 +399,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
     }
   }
 
-  // Componente para renderizar os resultados expandidos (sempre aberto no PNG)
+  // Componente para renderizar os resultados expandidos
   const ResultsForPNG = () => (
     <div className="space-y-4 bg-gray-900 p-4 rounded-xl">
       <div className="flex items-center justify-between">
@@ -371,11 +409,19 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         </div>
       </div>
 
-      {/* Resumo Financeiro com Margem */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      {/* Resumo Financeiro com Margem ATUALIZADO */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-blue-500/10 rounded-xl">
         <div className="text-center">
-          <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
-          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+          <p className="text-orange-300 text-xs font-semibold">Custo Materiais</p>
+          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalMaterialCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-purple-300 text-xs font-semibold">Custo Tempo</p>
+          <p className="text-purple-400 text-lg font-bold">R$ {calculations.totalTimeCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-red-300 text-xs font-semibold">Custo Total</p>
+          <p className="text-red-400 text-lg font-bold">R$ {calculations.totalCost}</p>
         </div>
         <div className="text-center">
           <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
@@ -385,49 +431,64 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
           <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
           <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
         </div>
-        <div className="text-center">
-          <p className="text-purple-300 text-xs font-semibold">Margem</p>
-          <p className="text-purple-400 text-lg font-bold">
-            {calculations.totalRevenue > 0 
-              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-              : '0'
-            }%
-          </p>
-          <p className="text-purple-300 text-xs">
-            Custo: {calculations.totalRevenue > 0 
-              ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-              : '0'
-            }%
-          </p>
-        </div>
       </div>
 
-      {/* Bolos do Lote - SEMPRE ABERTO no PNG */}
+      {/* Margem de Lucro */}
+      <div className="text-center p-3 bg-purple-500/10 rounded-xl">
+        <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
+        <p className="text-purple-400 text-xl font-bold">
+          {calculations.totalRevenue > 0
+            ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+            : '0'
+          }%
+        </p>
+        <p className="text-purple-300 text-xs">
+          Custo: {calculations.totalRevenue > 0
+            ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+            : '0'
+          }%
+        </p>
+      </div>
+
+      {/* Bolos do Lote - ATUALIZADO com custo tempo */}
       <div>
         <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
           Bolos do Lote ({calculations.cakeDetails.length})
         </h4>
         <div className="space-y-2">
           {calculations.cakeDetails.map((item, idx) => {
-            const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
-            
+            const marginInfo = calculateProfitMargin(item.totalCost || 0, item.revenue || 0);
+
             return (
-              <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                <div className="flex-1">
-                  <span className="text-white font-medium text-sm">{item.cake.name}</span>
-                  <div className="text-white/60 text-xs">
-                    {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • R$ {(item.totalCost || 0).toFixed(2)} total
+              <div key={idx} className="p-3 rounded-lg bg-white/5">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <span className="text-white font-medium text-sm">{item.cake.name}</span>
+                    <div className="text-white/60 text-xs">
+                      {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un
+                    </div>
                   </div>
-                  <div className="text-xs text-purple-400 mt-1">
-                    Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                  <div className="text-right">
+                    <div className="text-green-400 font-semibold text-sm">
+                      R$ {(item.revenue || 0).toFixed(2)}
+                    </div>
+                    <div className="text-green-300 text-xs">
+                      Lucro: R$ {(item.profit || 0).toFixed(2)}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-green-400 font-semibold text-sm">
-                    R$ {(item.revenue || 0).toFixed(2)}
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-center">
+                    <p className="text-orange-400">Materiais</p>
+                    <p className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</p>
                   </div>
-                  <div className="text-green-300 text-xs">
-                    Lucro: R$ {(item.profit || 0).toFixed(2)}
+                  <div className="text-center">
+                    <p className="text-purple-400">Tempo</p>
+                    <p className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-blue-400">Margem</p>
+                    <p className="text-blue-300">{marginInfo.profitMargin}%</p>
                   </div>
                 </div>
               </div>
@@ -436,7 +497,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         </div>
       </div>
 
-      {/* Massas Agrupadas - SEMPRE ABERTO no PNG */}
+      {/* Massas Agrupadas */}
       {Object.keys(calculations.massGroups).length > 0 && (
         <div>
           <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
@@ -453,7 +514,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                   <p className="text-white/60 text-xs mb-2">
                     Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
                   </p>
-                  
+
                   <p className="text-white/60 text-xs mb-1">Bolos que usam esta massa:</p>
                   <div className="space-y-1 mb-3">
                     {massData.cakes.map((cakeItem, idx) => (
@@ -474,7 +535,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {data.unit === 'un' 
+                              {data.unit === 'un'
                                 ? `${data.quantity} ${data.unit}`
                                 : `${data.quantity}${data.unit}`
                               }
@@ -495,7 +556,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         </div>
       )}
 
-      {/* Coberturas Agrupadas - SEMPRE ABERTO no PNG */}
+      {/* Coberturas Agrupadas */}
       {Object.keys(calculations.frostingGroups).length > 0 && (
         <div>
           <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
@@ -512,7 +573,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                   <p className="text-white/60 text-xs mb-2">
                     Total necessário: <strong>{(frostingData.totalGrams || 0).toFixed(2)}g</strong>
                   </p>
-                  
+
                   <p className="text-white/60 text-xs mb-1">Bolos que usam esta cobertura:</p>
                   <div className="space-y-1 mb-3">
                     {frostingData.cakes.map((cakeItem, idx) => (
@@ -533,7 +594,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                           <div key={productName} className="flex justify-between text-xs">
                             <span className="text-white">{productName}</span>
                             <span className="text-green-300 font-semibold">
-                              {data.unit === 'un' 
+                              {data.unit === 'un'
                                 ? `${data.quantity} ${data.unit}`
                                 : `${data.quantity}${data.unit}`
                               }
@@ -565,7 +626,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Seleção de Bolos */}
+      {/* Seleção de Bolos - ATUALIZADO */}
       <GlassCard>
         <h2 className="text-xl md:text-2xl font-bold text-primary mb-4 flex items-center gap-2">
           <FaCalculator />
@@ -574,18 +635,36 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
         <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
           {cakes.map(cake => {
-            const cakeCost = calculateCakeCost(cake) || 0
-            const cakeSalePrice = cake.salePrice || (cakeCost * 3)
-            
+            const costBreakdown = calculateCakeCost(cake)
+            const cakeSalePrice = cake.salePrice || (costBreakdown.totalCost * 3)
+
             return (
               <div key={cake._id} className="flex items-center flex-col md:flex-row justify-between p-4 rounded-2xl bg-white/5">
                 <div className="flex-1">
                   <h3 className="font-semibold text-primary">{cake.name}</h3>
                   <p className="text-secondary text-sm">
                     {cake.masses?.length || 0} massa(s) • {cake.frostings?.length || 0} cobertura(s)
+                    {cake.preparationTime > 0 && (
+                      <span className="text-purple-400 ml-2">
+                        • {cake.preparationTime}min
+                      </span>
+                    )}
                   </p>
                   <div className="text-xs space-y-1 mt-1">
-                    <p className="text-orange-400">Custo: R$ {cakeCost.toFixed(2)}</p>
+                    <div className="flex justify-between">
+                      <span className="text-orange-400">Materiais:</span>
+                      <span className="text-orange-300">R$ {costBreakdown.materialCost.toFixed(2)}</span>
+                    </div>
+                    {costBreakdown.timeCost > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-purple-400">Custo Tempo:</span>
+                        <span className="text-purple-300">R$ {costBreakdown.timeCost.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-white/20 pt-1">
+                      <span className="text-white font-semibold">Total:</span>
+                      <span className="text-white font-bold">R$ {costBreakdown.totalCost.toFixed(2)}</span>
+                    </div>
                     <p className="text-green-500 font-semibold">
                       Venda: R$ {cakeSalePrice.toFixed(2)}
                     </p>
@@ -630,7 +709,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
         </GlassButton>
       </GlassCard>
 
-      {/* Resultados */}
+      {/* Resultados - ATUALIZADO */}
       <GlassCard>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl md:text-2xl font-bold text-primary">Resultados do Lote</h2>
@@ -646,7 +725,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
         {calculations ? (
           <div className="space-y-4">
-            {/* Resumo Financeiro com Margem */}
+            {/* Resumo Financeiro ATUALIZADO */}
             <div
               className="cursor-pointer"
               onClick={() => toggleSection('summary')}
@@ -658,32 +737,49 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
             </div>
 
             {expandedSections.summary && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white/5 rounded-2xl">
-                <div className="text-center">
-                  <p className="text-orange-300 text-sm font-semibold">Custo Total</p>
-                  <p className="text-orange-400 text-2xl font-bold">R$ {calculations.totalCost}</p>
+              <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
+                {/* Grid de Custos Detalhados */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-3 bg-orange-500/10 rounded-xl">
+                    <p className="text-orange-300 text-sm font-semibold">Custo Materiais</p>
+                    <p className="text-orange-400 text-2xl font-bold">R$ {calculations.totalMaterialCost}</p>
+                  </div>
+
+                  <div className="text-center p-3 bg-purple-500/10 rounded-xl">
+                    <p className="text-purple-300 text-sm font-semibold">Custo Tempo</p>
+                    <p className="text-purple-400 text-2xl font-bold">R$ {calculations.totalTimeCost}</p>
+                  </div>
+
+                  <div className="text-center p-3 bg-red-500/10 rounded-xl">
+                    <p className="text-red-300 text-sm font-semibold">Custo Total</p>
+                    <p className="text-red-400 text-2xl font-bold">R$ {calculations.totalCost}</p>
+                  </div>
                 </div>
 
-                <div className="text-center">
-                  <p className="text-blue-300 text-sm font-semibold">Receita Total</p>
-                  <p className="text-blue-400 text-2xl font-bold">R$ {calculations.totalRevenue}</p>
+                {/* Grid de Receita e Lucro */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-blue-500/10 rounded-xl">
+                    <p className="text-blue-300 text-sm font-semibold">Receita Total</p>
+                    <p className="text-blue-400 text-2xl font-bold">R$ {calculations.totalRevenue}</p>
+                  </div>
+
+                  <div className="text-center p-3 bg-green-500/10 rounded-xl">
+                    <p className="text-green-300 text-sm font-semibold">Lucro Total</p>
+                    <p className="text-green-400 text-2xl font-bold">R$ {calculations.totalProfit}</p>
+                  </div>
                 </div>
 
-                <div className="text-center">
-                  <p className="text-green-300 text-sm font-semibold">Lucro Total</p>
-                  <p className="text-green-400 text-2xl font-bold">R$ {calculations.totalProfit}</p>
-                </div>
-
-                <div className="text-center">
+                {/* Margem de Lucro */}
+                <div className="text-center p-3 bg-purple-500/10 rounded-xl">
                   <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
                   <p className="text-purple-400 text-2xl font-bold">
-                    {calculations.totalRevenue > 0 
+                    {calculations.totalRevenue > 0
                       ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
                       : '0'
                     }%
                   </p>
                   <p className="text-purple-300 text-xs">
-                    Custo: {calculations.totalRevenue > 0 
+                    Custo: {calculations.totalRevenue > 0
                       ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
                       : '0'
                     }%
@@ -706,14 +802,26 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
             {expandedSections.cakes && (
               <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
                 {calculations.cakeDetails.map((item, idx) => {
-                  const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
+                  const marginInfo = calculateProfitMargin(item.totalCost || 0, item.revenue || 0);
                   
                   return (
                     <div key={idx} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
                       <div>
                         <span className="text-primary font-semibold">{item.cake.name}</span>
                         <div className="text-secondary text-xs">
-                          {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • R$ {(item.totalCost || 0).toFixed(2)} total
+                          {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo total
+                        </div>
+                        <div className="text-xs space-y-1 mt-1">
+                          <div className="flex justify-between">
+                            <span className="text-orange-400">Materiais:</span>
+                            <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                          </div>
+                          {item.timeCost > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-purple-400">Tempo:</span>
+                              <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="text-xs text-purple-400 mt-1">
                           Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
@@ -721,10 +829,10 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                       </div>
                       <div className="text-right">
                         <div className="text-green-400 font-semibold">
-                          R$ {(item.revenue || 0).toFixed(2)}
+                          R$ {item.revenue.toFixed(2)}
                         </div>
                         <div className="text-green-300 text-xs">
-                          Lucro: R$ {(item.profit || 0).toFixed(2)}
+                          Lucro: R$ {item.profit.toFixed(2)}
                         </div>
                       </div>
                     </div>
@@ -779,7 +887,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                               <div key={productName} className="flex justify-between text-sm">
                                 <span className="text-white">{productName}</span>
                                 <span className="text-primary-300 font-semibold">
-                                  {data.unit === 'un' 
+                                  {data.unit === 'un'
                                     ? `${data.quantity} ${data.unit}`
                                     : `${data.quantity}${data.unit}`
                                   }
@@ -845,7 +953,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
                               <div key={productName} className="flex justify-between text-sm">
                                 <span className="text-white">{productName}</span>
                                 <span className="text-primary-300 font-semibold">
-                                  {data.unit === 'un' 
+                                  {data.unit === 'un'
                                     ? `${data.quantity} ${data.unit}`
                                     : `${data.quantity}${data.unit}`
                                   }
@@ -877,7 +985,7 @@ export default function CakeBatchCalculator({ cakes, cakeMasses, cakeFrostings, 
 
       {/* Informação sobre unidades */}
       {calculations && (
-        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl col-span-full">
+        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
           <p className="text-blue-300 text-sm text-center">
             💡 <strong>Unidades convertidas:</strong> Kg → g, L → ml, Unidades mantidas como "un"
           </p>

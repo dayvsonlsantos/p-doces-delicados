@@ -46,12 +46,12 @@ const formatQuantity = (value, unit) => {
 }
 
 // Função para calcular margem de lucro
-const calculateProfitMargin = (cost, salePrice) => {
-  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
-  
-  const costMargin = (cost / salePrice) * 100;
+const calculateProfitMargin = (totalCost, salePrice) => {
+  if (totalCost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+
+  const costMargin = (totalCost / salePrice) * 100;
   const profitMargin = 100 - costMargin;
-  
+
   return {
     costMargin: costMargin.toFixed(1),
     profitMargin: profitMargin.toFixed(1)
@@ -83,6 +83,8 @@ export default function CalculatorModal({
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [showCustomDate, setShowCustomDate] = useState(false)
+  const [fixedCosts, setFixedCosts] = useState([])
+  const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
 
   const resultsRef = useRef(null)
   const startDateRef = useRef(null)
@@ -112,8 +114,81 @@ export default function CalculatorModal({
 
       setCustomStartDate(today.toISOString().split('T')[0])
       setCustomEndDate(tenDaysLater.toISOString().split('T')[0])
+      loadFixedCosts()
     }
   }, [isOpen])
+
+  const loadFixedCosts = async () => {
+    try {
+      const response = await fetch('/api/fixed-costs')
+      const data = await response.json()
+      setFixedCosts(data)
+
+      const total = data.reduce((sum, cost) => sum + (parseFloat(cost.costPerMinute) || 0), 0)
+      setTotalCostPerMinute(total)
+    } catch (error) {
+      console.error('Erro ao carregar custos fixos:', error)
+    }
+  }
+
+  // FUNÇÃO CORRIGIDA: Calcular custo de ingrediente
+  const calculateIngredientCost = (ingredient) => {
+    if (!ingredient || !ingredient.productId || !ingredient.grams) return 0
+
+    const product = products.find(p => p._id === ingredient.productId)
+    if (!product) {
+      console.log('❌ Produto não encontrado para ingrediente:', ingredient.productId)
+      return 0
+    }
+
+    const ingredientGrams = parseFloat(ingredient.grams)
+
+    if (product.unit === 'un') {
+      const unitWeight = 50 // padrão 50g por unidade
+      const units = ingredientGrams / unitWeight
+      const cost = units * (product.unitCost || 0)
+      return cost
+    } else {
+      const cost = ingredientGrams * (product.baseUnitCost || 0)
+      return cost
+    }
+  }
+
+  // FUNÇÃO CORRIGIDA: Calcular custo de massa/cobertura
+  const calculateMassOrFrostingCost = (item) => {
+    if (!item || !item.ingredients) {
+      console.log('❌ Item sem ingredientes:', item?.name)
+      return 0
+    }
+
+    const totalCost = item.ingredients.reduce((total, ingredient) => {
+      const cost = calculateIngredientCost(ingredient)
+      return total + cost
+    }, 0)
+
+    return totalCost
+  }
+
+  const calculateTimeCost = (product) => {
+    if (!product.preparationTime || totalCostPerMinute === 0) return 0
+
+    const preparationTime = parseFloat(product.preparationTime) || 0
+    return totalCostPerMinute * preparationTime
+  }
+
+  // Função para calcular custo do docinho CORRIGIDA
+  const calculateCandyCost = (candy) => {
+    if (!candy) return { materialCost: 0, timeCost: 0, totalCost: 0 }
+
+    const materialCost = candy.costPerUnit || 0
+    const timeCost = calculateTimeCost(candy)
+
+    return {
+      materialCost,
+      timeCost,
+      totalCost: materialCost + timeCost
+    }
+  }
 
   // Limpar seleção quando mudar o tipo
   useEffect(() => {
@@ -268,75 +343,118 @@ export default function CalculatorModal({
     return frosting
   }
 
-  // Função para calcular custo de massa/cobertura
-  const calculateMassCost = (mass) => {
-    if (!mass || !mass.ingredients) return 0
-
-    let totalCost = 0
-    mass.ingredients.forEach(ingredient => {
-      const product = products.find(p => p._id === ingredient.productId)
-      if (product && ingredient.grams) {
-        const ingredientGrams = parseFloat(ingredient.grams)
-        let cost = 0
-
-        if (product.unit === 'un') {
-          const unitWeight = product.unitWeight || 50
-          const units = ingredientGrams / unitWeight
-          cost = units * (product.unitCost || product.costPerUnit || 0)
-        } else {
-          const convertedGrams = convertUnit(ingredientGrams, 'g', product.unit)
-          cost = convertedGrams * (product.baseUnitCost || product.costPerUnit || 0)
-        }
-
-        totalCost += cost
-      }
-    })
-    return totalCost
-  }
-
-  // FUNÇÃO CORRIGIDA: Calcular custo completo do bolo
+  // FUNÇÃO PRINCIPAL CORRIGIDA: Calcular custo completo do bolo
   const calculateCakeCost = (cake) => {
-    if (!cake) return 0
+    console.log('🧮 CALCULANDO CUSTO DO BOLO:', cake.name)
+    console.log('📦 Massas do bolo:', cake.masses)
+    console.log('🎂 Coberturas do bolo:', cake.frostings)
 
     let totalCost = 0
+    let massCost = 0
+    let frostingCost = 0
 
-    console.log(`🔍 Calculando custo do bolo: ${cake.name}`)
+    // 1. Calcular custo das massas - CORRIGIDO
+    if (cake.masses && cake.masses.length > 0) {
+      console.log('📦 Processando massas:', cake.masses.length)
 
-    // Cálculo das massas do bolo
-    if (cake.masses) {
       cake.masses.forEach(massItem => {
+        console.log('🔍 Procurando massa:', massItem.massName)
+
+        // CORREÇÃO: Buscar massa pelo nome
         const mass = findMassByName(massItem.massName)
-        if (mass && massItem.grams) {
-          const massTotalCost = mass.cost || calculateMassCost(mass)
-          const massCostPerGram = massTotalCost / mass.totalGrams
-          const massGrams = parseFloat(massItem.grams)
-          const massCost = massCostPerGram * massGrams
-          totalCost += massCost
-          console.log(`💰 Massa "${massItem.massName}": ${massGrams}g = R$ ${massCost.toFixed(2)}`)
+
+        if (mass) {
+          console.log('✅ Massa encontrada:', mass.name)
+          console.log('📊 Dados da massa:', {
+            totalGrams: mass.totalGrams,
+            ingredients: mass.ingredients,
+            cost: mass.cost
+          })
+
+          // Calcular custo total da massa se não existir
+          const massTotalCost = mass.cost || calculateMassOrFrostingCost(mass)
+          console.log('💰 Custo total da massa:', massTotalCost)
+
+          if (mass.totalGrams && mass.totalGrams > 0) {
+            // Calcular custo por grama
+            const massCostPerGram = massTotalCost / mass.totalGrams
+            console.log('📊 Custo por grama da massa:', massCostPerGram)
+
+            // Calcular custo da quantidade usada no bolo
+            const massGrams = parseFloat(massItem.grams) || 0
+            const thisMassCost = massCostPerGram * massGrams
+            console.log('🧮 Custo desta massa no bolo:', thisMassCost)
+
+            massCost += thisMassCost
+            totalCost += thisMassCost
+          } else {
+            console.log('⚠️ Massa sem totalGrams definido')
+          }
         } else {
-          console.log(`⚠️ Massa não encontrada ou sem grams: ${massItem.massName}`)
+          console.log('❌ Massa não encontrada:', massItem.massName)
+          console.log('📋 Massas disponíveis:', masses.map(m => m.name))
         }
       })
+    } else {
+      console.log('⚠️ Nenhuma massa definida para o bolo')
     }
 
-    // Cálculo das coberturas do bolo
-    if (cake.frostings) {
+    // 2. Calcular custo das coberturas - CORRIGIDO
+    if (cake.frostings && cake.frostings.length > 0) {
+      console.log('🎂 Processando coberturas:', cake.frostings.length)
+
       cake.frostings.forEach(frostingItem => {
+        console.log('🔍 Procurando cobertura:', frostingItem.frostingName)
+
+        // CORREÇÃO: Buscar cobertura pelo nome
         const frosting = findFrostingByName(frostingItem.frostingName)
-        if (frosting && frostingItem.grams) {
-          const frostingTotalCost = frosting.cost || calculateMassCost(frosting)
-          const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
-          const frostingGrams = parseFloat(frostingItem.grams)
-          const frostingCost = frostingCostPerGram * frostingGrams
-          totalCost += frostingCost
-          console.log(`💰 Cobertura "${frostingItem.frostingName}": ${frostingGrams}g = R$ ${frostingCost.toFixed(2)}`)
+
+        if (frosting) {
+          console.log('✅ Cobertura encontrada:', frosting.name)
+          console.log('📊 Dados da cobertura:', {
+            totalGrams: frosting.totalGrams,
+            ingredients: frosting.ingredients,
+            cost: frosting.cost
+          })
+
+          // Calcular custo total da cobertura se não existir
+          const frostingTotalCost = frosting.cost || calculateMassOrFrostingCost(frosting)
+          console.log('💰 Custo total da cobertura:', frostingTotalCost)
+
+          if (frosting.totalGrams && frosting.totalGrams > 0) {
+            // Calcular custo por grama
+            const frostingCostPerGram = frostingTotalCost / frosting.totalGrams
+            console.log('📊 Custo por grama da cobertura:', frostingCostPerGram)
+
+            // Calcular custo da quantidade usada no bolo
+            const frostingGrams = parseFloat(frostingItem.grams) || 0
+            const thisFrostingCost = frostingCostPerGram * frostingGrams
+            console.log('🧮 Custo desta cobertura no bolo:', thisFrostingCost)
+
+            frostingCost += thisFrostingCost
+            totalCost += thisFrostingCost
+          } else {
+            console.log('⚠️ Cobertura sem totalGrams definido')
+          }
         } else {
-          console.log(`⚠️ Cobertura não encontrada ou sem grams: ${frostingItem.frostingName}`)
+          console.log('❌ Cobertura não encontrada:', frostingItem.frostingName)
+          console.log('📋 Coberturas disponíveis:', cakeFrostings.map(f => f.name))
         }
       })
+    } else {
+      console.log('⚠️ Nenhuma cobertura definida para o bolo')
     }
 
-    console.log(`💰 Custo total do bolo "${cake.name}": R$ ${totalCost.toFixed(2)}`)
+    // 3. Calcular custo do tempo
+    const timeCost = calculateTimeCost(cake)
+    totalCost += timeCost
+
+    console.log('📊 RESUMO FINAL DO BOLO', cake.name)
+    console.log('💰 Custo massas:', massCost)
+    console.log('💰 Custo coberturas:', frostingCost)
+    console.log('💰 Custo tempo:', timeCost)
+    console.log('💰 Custo total:', totalCost)
+
     return totalCost
   }
 
@@ -455,7 +573,7 @@ export default function CalculatorModal({
     return allIngredients
   }
 
-  // Função principal de cálculo CORRIGIDA
+  // FUNÇÃO PRINCIPAL DE CÁLCULO CORRIGIDA
   const handleCalculate = () => {
     const selectedItemsArray = Object.values(selectedItems).filter(item => item.quantity > 0)
 
@@ -480,6 +598,8 @@ export default function CalculatorModal({
       // Cálculo para docinhos - CORRIGIDO
       const candyDetails = []
       const massGroups = {}
+      let totalMaterialCost = 0
+      let totalTimeCost = 0
       let totalCost = 0
       let totalRevenue = 0
       let totalProfit = 0
@@ -489,23 +609,30 @@ export default function CalculatorModal({
         const quantity = selectedItem.quantity
 
         if (product && quantity > 0) {
-          // Calcular custo corretamente
-          const itemCost = (product.costPerUnit || 0) * quantity
+          // Calcular custo corretamente usando a mesma lógica do Goals
+          const costBreakdown = calculateCandyCost(product)
+          const itemMaterialCost = costBreakdown.materialCost * quantity
+          const itemTimeCost = costBreakdown.timeCost
+          const itemTotalCost = itemMaterialCost + itemTimeCost
+
           const itemRevenue = (selectedItem.unitPrice || product.salePrice || 0) * quantity
-          const itemProfit = itemRevenue - itemCost
+          const itemProfit = itemRevenue - itemTotalCost
 
           candyDetails.push({
             candy: product,
             quantity,
-            unitCost: product.costPerUnit || 0,
-            totalCost: itemCost,
+            materialCost: itemMaterialCost,
+            timeCost: itemTimeCost,
+            totalCost: itemTotalCost,
             salePrice: selectedItem.unitPrice || product.salePrice || 0,
             totalRevenue: itemRevenue,
             totalProfit: itemProfit,
             orderNumber: selectedItem.orderNumber
           })
 
-          totalCost += itemCost
+          totalMaterialCost += itemMaterialCost
+          totalTimeCost += itemTimeCost
+          totalCost += itemTotalCost
           totalRevenue += itemRevenue
           totalProfit += itemProfit
 
@@ -514,7 +641,7 @@ export default function CalculatorModal({
 
           productMasses.forEach(massItem => {
             if (massItem.massName && massItem.grams) {
-              const mass = masses.find(m => m.name === massItem.massName)
+              const mass = findMassByName(massItem.massName)
               if (mass) {
                 if (!massGroups[massItem.massName]) {
                   massGroups[massItem.massName] = {
@@ -545,6 +672,8 @@ export default function CalculatorModal({
         candyDetails: candyDetails || [],
         massGroups,
         consolidatedIngredients,
+        totalMaterialCost: totalMaterialCost.toFixed(2),
+        totalTimeCost: totalTimeCost.toFixed(2),
         totalCost: totalCost.toFixed(2),
         totalRevenue: totalRevenue.toFixed(2),
         totalProfit: totalProfit.toFixed(2),
@@ -556,6 +685,8 @@ export default function CalculatorModal({
       const cakeDetails = []
       const massGroups = {}
       const frostingGroups = {}
+      let totalMaterialCost = 0
+      let totalTimeCost = 0
       let totalCost = 0
       let totalRevenue = 0
       let totalProfit = 0
@@ -567,9 +698,13 @@ export default function CalculatorModal({
         if (product && quantity > 0) {
           console.log(`🎂 Processando bolo: ${product.name}`)
 
-          // Calcular custo detalhado do bolo
+          // Calcular custo detalhado do bolo usando a mesma lógica do Goals
           const cakeUnitCost = calculateCakeCost(product) || 0
           const cakeTotalCost = cakeUnitCost * quantity
+
+          // Separar custo material e tempo
+          const timeCost = calculateTimeCost(product)
+          const materialCost = cakeTotalCost - timeCost
 
           // Calcular receita
           const itemRevenue = (selectedItem.unitPrice || product.salePrice || (cakeUnitCost * 3)) * quantity
@@ -579,6 +714,8 @@ export default function CalculatorModal({
             cake: product,
             quantity,
             unitCost: cakeUnitCost,
+            materialCost: materialCost,
+            timeCost: timeCost,
             totalCost: cakeTotalCost,
             salePrice: selectedItem.unitPrice || product.salePrice || (cakeUnitCost * 3),
             revenue: itemRevenue,
@@ -586,6 +723,8 @@ export default function CalculatorModal({
             orderNumber: selectedItem.orderNumber
           })
 
+          totalMaterialCost += materialCost
+          totalTimeCost += timeCost
           totalCost += cakeTotalCost
           totalRevenue += itemRevenue
           totalProfit += itemProfit
@@ -658,6 +797,8 @@ export default function CalculatorModal({
         cakeDetails,
         massGroups,
         frostingGroups,
+        totalMaterialCost,
+        totalTimeCost,
         totalCost,
         totalRevenue,
         totalProfit
@@ -668,6 +809,8 @@ export default function CalculatorModal({
         massGroups,
         frostingGroups,
         consolidatedIngredients,
+        totalMaterialCost: totalMaterialCost.toFixed(2),
+        totalTimeCost: totalTimeCost.toFixed(2),
         totalCost: totalCost.toFixed(2),
         totalRevenue: totalRevenue.toFixed(2),
         totalProfit: totalProfit.toFixed(2),
@@ -678,7 +821,7 @@ export default function CalculatorModal({
 
   const selectAllItems = () => {
     const newSelection = {}
-    
+
     filteredOrders.forEach(order => {
       const items = getOrderItems(order)
       items.forEach(item => {
@@ -690,7 +833,7 @@ export default function CalculatorModal({
         }
       })
     })
-    
+
     setSelectedItems(newSelection)
   }
 
@@ -700,16 +843,16 @@ export default function CalculatorModal({
 
   const getOrderItems = (order) => {
     if (!order.items) return []
-    
+
     const items = order.items.filter(item => {
       if (selectedType === 'docinhos') return item.itemType === 'candy'
       if (selectedType === 'bolos') return item.itemType === 'cake'
       return true
     }).map(item => {
-      const product = selectedType === 'docinhos' 
+      const product = selectedType === 'docinhos'
         ? candies.find(c => c._id === item.itemId)
         : cakes.find(c => c._id === item.itemId)
-      
+
       return {
         ...item,
         product: product,
@@ -733,7 +876,7 @@ export default function CalculatorModal({
 
   const toggleItemSelection = (orderId, item) => {
     const itemKey = `${orderId}-${item.itemId}`
-    
+
     setSelectedItems(prev => {
       if (prev[itemKey]) {
         const newItems = { ...prev }
@@ -853,11 +996,19 @@ export default function CalculatorModal({
         </div>
       </div>
 
-      {/* Resumo Financeiro com Margem */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      {/* Resumo Financeiro com Custo Materiais, Custo Tempo e Custo Total */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-blue-500/10 rounded-xl">
         <div className="text-center">
-          <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
-          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+          <p className="text-orange-300 text-xs font-semibold">Custo Materiais</p>
+          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalMaterialCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-purple-300 text-xs font-semibold">Custo Tempo</p>
+          <p className="text-purple-400 text-lg font-bold">R$ {calculations.totalTimeCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-red-300 text-xs font-semibold">Custo Total</p>
+          <p className="text-red-400 text-lg font-bold">R$ {calculations.totalCost}</p>
         </div>
         <div className="text-center">
           <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
@@ -867,21 +1018,23 @@ export default function CalculatorModal({
           <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
           <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
         </div>
-        <div className="text-center">
-          <p className="text-purple-300 text-xs font-semibold">Margem</p>
-          <p className="text-purple-400 text-lg font-bold">
-            {calculations.totalRevenue > 0 
-              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-              : '0'
-            }%
-          </p>
-          <p className="text-purple-300 text-xs">
-            Custo: {calculations.totalRevenue > 0 
-              ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-              : '0'
-            }%
-          </p>
-        </div>
+      </div>
+
+      {/* Margem de Lucro */}
+      <div className="text-center p-3 bg-purple-500/10 rounded-xl">
+        <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
+        <p className="text-purple-400 text-xl font-bold">
+          {calculations.totalRevenue > 0
+            ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+            : '0'
+          }%
+        </p>
+        <p className="text-purple-300 text-xs">
+          Custo: {calculations.totalRevenue > 0
+            ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+            : '0'
+          }%
+        </p>
       </div>
 
       {/* Conteúdo específico por tipo */}
@@ -895,14 +1048,24 @@ export default function CalculatorModal({
             </h4>
             <div className="space-y-2">
               {calculations.cakeDetails?.map((item, idx) => {
-                const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
-                
+                const marginInfo = calculateProfitMargin(item.totalCost || 0, item.revenue || 0);
+
                 return (
                   <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
                     <div className="flex-1">
                       <span className="text-white font-medium text-sm">{item.cake.name}</span>
                       <div className="text-white/60 text-xs">
-                        {item.quantity} un • R$ {item.unitCost.toFixed(2)}/un • {item.orderNumber}
+                        {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • {item.orderNumber}
+                      </div>
+                      <div className="text-xs space-y-1 mt-1">
+                        <div className="flex justify-between">
+                          <span className="text-orange-400">Materiais:</span>
+                          <span className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-400">Tempo:</span>
+                          <span className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</span>
+                        </div>
                       </div>
                       <div className="text-xs text-purple-400 mt-1">
                         Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
@@ -910,10 +1073,10 @@ export default function CalculatorModal({
                     </div>
                     <div className="text-right">
                       <div className="text-green-400 font-semibold text-sm">
-                        R$ {item.revenue.toFixed(2)}
+                        R$ {(item.revenue || 0).toFixed(2)}
                       </div>
                       <div className="text-green-300 text-xs">
-                        Lucro: R$ {item.profit.toFixed(2)}
+                        Lucro: R$ {(item.profit || 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -1044,18 +1207,28 @@ export default function CalculatorModal({
           {/* Itens Selecionados */}
           <div>
             <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-              Itens Selecionados ({calculations.candyDetails?.length || 0})
+              Docinhos do Lote ({calculations.candyDetails?.length || 0})
             </h4>
             <div className="space-y-2">
               {calculations.candyDetails?.map((item, idx) => {
-                const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
-                
+                const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
+
                 return (
                   <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
                     <div className="flex-1">
                       <span className="text-white font-medium text-sm">{item.candy.name}</span>
                       <div className="text-white/60 text-xs">
-                        {item.quantity} un • {item.orderNumber}
+                        {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un • {item.orderNumber}
+                      </div>
+                      <div className="text-xs space-y-1 mt-1">
+                        <div className="flex justify-between">
+                          <span className="text-orange-400">Materiais:</span>
+                          <span className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-400">Tempo:</span>
+                          <span className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</span>
+                        </div>
                       </div>
                       <div className="text-xs text-purple-400 mt-1">
                         Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
@@ -1063,10 +1236,10 @@ export default function CalculatorModal({
                     </div>
                     <div className="text-right">
                       <div className="text-green-400 font-semibold text-sm">
-                        R$ {item.totalRevenue.toFixed(2)}
+                        R$ {(item.totalRevenue || 0).toFixed(2)}
                       </div>
                       <div className="text-green-300 text-xs">
-                        Lucro: R$ {item.totalProfit.toFixed(2)}
+                        Lucro: R$ {(item.totalProfit || 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -1186,6 +1359,9 @@ export default function CalculatorModal({
                 <p className="text-blue-300 text-xs mt-1">
                   <strong>Tipo atual:</strong> {selectedType === 'docinhos' ? 'Docinhos' : 'Bolos'}
                 </p>
+                <p className="text-blue-300 text-xs mt-1">
+                  <strong>Otimização de tempo:</strong> Itens iguais na mesma produção não somam tempo adicional
+                </p>
               </div>
 
               {/* Seleção de Tipo */}
@@ -1196,8 +1372,8 @@ export default function CalculatorModal({
                     type="button"
                     onClick={() => setSelectedType('docinhos')}
                     className={`h-12 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 ${selectedType === 'docinhos'
-                        ? 'bg-primary-500/20 border-primary-400 text-primary-300'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      ? 'bg-primary-500/20 border-primary-400 text-primary-300'
+                      : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
                       }`}
                   >
                     <span className="text-base">🍬</span>
@@ -1207,8 +1383,8 @@ export default function CalculatorModal({
                     type="button"
                     onClick={() => setSelectedType('bolos')}
                     className={`h-12 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-2 ${selectedType === 'bolos'
-                        ? 'bg-primary-500/20 border-primary-400 text-primary-300'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      ? 'bg-primary-500/20 border-primary-400 text-primary-300'
+                      : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
                       }`}
                   >
                     <span className="text-base">🎂</span>
@@ -1235,7 +1411,7 @@ export default function CalculatorModal({
                   <select
                     value={dateFilter}
                     onChange={(e) => handleDateFilterChange(e.target.value)}
-                    className="h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    className="h-12 glass-input px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                   >
                     <option value="next10">Próximos 10 dias</option>
                     <option value="last4">Últimos 4 dias</option>
@@ -1396,8 +1572,8 @@ export default function CalculatorModal({
                                   <div
                                     key={itemKey}
                                     className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${isSelected
-                                        ? 'bg-green-500/20 border border-green-500/30'
-                                        : 'bg-white/5 hover:bg-white/10'
+                                      ? 'bg-green-500/20 border border-green-500/30'
+                                      : 'bg-white/5 hover:bg-white/10'
                                       }`}
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -1468,12 +1644,24 @@ export default function CalculatorModal({
                   </div>
                 </div>
 
-                {/* Resumo Financeiro com Margem */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
+                {/* Resumo Financeiro com Custo Materiais, Custo Tempo e Custo Total */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-blue-500/10 rounded-xl">
                   <div className="text-center">
-                    <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
-                    <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+                    <p className="text-orange-300 text-xs font-semibold">Custo Materiais</p>
+                    <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalMaterialCost}</p>
                   </div>
+                  <div className="text-center">
+                    <p className="text-purple-300 text-xs font-semibold">Custo Tempo</p>
+                    <p className="text-purple-400 text-lg font-bold">R$ {calculations.totalTimeCost}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-red-300 text-xs font-semibold">Custo Total</p>
+                    <p className="text-red-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+                  </div>
+                </div>
+
+                {/* Receita e Lucro */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-green-500/10 rounded-xl">
                   <div className="text-center">
                     <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
                     <p className="text-blue-400 text-lg font-bold">R$ {calculations.totalRevenue}</p>
@@ -1482,21 +1670,23 @@ export default function CalculatorModal({
                     <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
                     <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-purple-300 text-xs font-semibold">Margem</p>
-                    <p className="text-purple-400 text-lg font-bold">
-                      {calculations.totalRevenue > 0 
-                        ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-                        : '0'
-                      }%
-                    </p>
-                    <p className="text-purple-300 text-xs">
-                      Custo: {calculations.totalRevenue > 0 
-                        ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-                        : '0'
-                      }%
-                    </p>
-                  </div>
+                </div>
+
+                {/* Margem de Lucro */}
+                <div className="text-center p-3 bg-purple-500/10 rounded-xl">
+                  <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
+                  <p className="text-purple-400 text-xl font-bold">
+                    {calculations.totalRevenue > 0
+                      ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+                      : '0'
+                    }%
+                  </p>
+                  <p className="text-purple-300 text-xs">
+                    Custo: {calculations.totalRevenue > 0
+                      ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+                      : '0'
+                    }%
+                  </p>
                 </div>
 
                 {/* Conteúdo específico por tipo */}
@@ -1521,14 +1711,24 @@ export default function CalculatorModal({
                       {expandedResults.items && (
                         <div className="p-3 bg-white/3 space-y-2 max-h-40 overflow-y-auto">
                           {calculations.cakeDetails?.map((item, idx) => {
-                            const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
-                            
+                            const marginInfo = calculateProfitMargin(item.totalCost || 0, item.revenue || 0);
+
                             return (
                               <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
                                 <div className="flex-1">
                                   <span className="text-white font-medium text-sm">{item.cake.name}</span>
                                   <div className="text-white/60 text-xs">
-                                    {item.quantity} un • R$ {item.unitCost.toFixed(2)}/un • {item.orderNumber}
+                                    {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un • {item.orderNumber}
+                                  </div>
+                                  <div className="text-xs space-y-1 mt-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-orange-400">Materiais:</span>
+                                      <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-purple-400">Tempo:</span>
+                                      <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
+                                    </div>
                                   </div>
                                   <div className="text-xs text-purple-400 mt-1">
                                     Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
@@ -1713,7 +1913,7 @@ export default function CalculatorModal({
                         <div className="flex items-center justify-between">
                           <h4 className="text-white font-semibold text-sm flex items-center gap-2">
                             <FaList className="w-4 h-4" />
-                            Itens Selecionados ({calculations.candyDetails?.length || 0})
+                            Docinhos do Lote ({calculations.candyDetails?.length || 0})
                           </h4>
                           {expandedResults.items ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
                         </div>
@@ -1722,14 +1922,24 @@ export default function CalculatorModal({
                       {expandedResults.items && (
                         <div className="p-3 bg-white/3 space-y-2 max-h-40 overflow-y-auto">
                           {calculations.candyDetails?.map((item, idx) => {
-                            const marginInfo = calculateProfitMargin(item.unitCost || 0, item.salePrice || 0);
-                            
+                            const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
+
                             return (
                               <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
                                 <div className="flex-1">
                                   <span className="text-white font-medium text-sm">{item.candy.name}</span>
                                   <div className="text-white/60 text-xs">
-                                    {item.quantity} un • {item.orderNumber}
+                                    {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un • {item.orderNumber}
+                                  </div>
+                                  <div className="text-xs space-y-1 mt-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-orange-400">Materiais:</span>
+                                      <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-purple-400">Tempo:</span>
+                                      <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
+                                    </div>
                                   </div>
                                   <div className="text-xs text-purple-400 mt-1">
                                     Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)

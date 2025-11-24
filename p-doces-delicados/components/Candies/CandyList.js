@@ -1,13 +1,13 @@
-// components/Candies/CandyList.js (com margem de custo)
-import { FaEdit, FaTrash, FaCookie, FaCalendar, FaSync } from 'react-icons/fa'
+// components/Candies/CandyList.js (corrigido com custo de tempo)
+import { FaEdit, FaTrash, FaCookie, FaCalendar, FaSync, FaClock } from 'react-icons/fa'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
 
 // Função para calcular ambas as margens
-const calculateBothMargins = (cost, salePrice) => {
-  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+const calculateBothMargins = (totalCost, salePrice) => {
+  if (totalCost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
 
-  const costMargin = (cost / salePrice) * 100;
+  const costMargin = (totalCost / salePrice) * 100;
   const profitMargin = 100 - costMargin;
 
   return {
@@ -18,9 +18,12 @@ const calculateBothMargins = (cost, salePrice) => {
 
 export default function CandyList({ candies, masses, products, onEdit, onDelete }) {
   const [supplies, setSupplies] = useState([])
+  const [fixedCosts, setFixedCosts] = useState([])
+  const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
 
   useEffect(() => {
     loadSupplies()
+    loadFixedCosts()
   }, [])
 
   const loadSupplies = async () => {
@@ -30,6 +33,19 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
       setSupplies(data)
     } catch (error) {
       console.error('Erro ao carregar insumos:', error)
+    }
+  }
+
+  const loadFixedCosts = async () => {
+    try {
+      const response = await fetch('/api/fixed-costs')
+      const data = await response.json()
+      setFixedCosts(data)
+
+      const total = data.reduce((sum, cost) => sum + (parseFloat(cost.costPerMinute) || 0), 0)
+      setTotalCostPerMinute(total)
+    } catch (error) {
+      console.error('Erro ao carregar custos fixos:', error)
     }
   }
 
@@ -75,11 +91,29 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     return totalCost
   }
 
+  // CORREÇÃO: Função para calcular custo com tempo
+  const calculateTimeCost = (candy) => {
+    if (!candy.preparationTime || totalCostPerMinute === 0) return 0
+    
+    const preparationTime = parseFloat(candy.preparationTime) || 0
+    return totalCostPerMinute * preparationTime
+  }
+
+  // CORREÇÃO: Função principal de cálculo do custo do docinho
   const calculateCandyCost = (candy) => {
     const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
 
     if (!candyMasses || candyMasses.length === 0 || !candyMasses.some(mass => mass.massName && mass.grams)) {
-      return { massCost: 0, extrasCost: 0, suppliesCost: 0, totalCost: 0, totalGrams: 0, massDetails: [] }
+      return { 
+        massCost: 0, 
+        extrasCost: 0, 
+        suppliesCost: 0, 
+        timeCost: 0,
+        totalMaterialCost: 0,
+        totalCost: 0, 
+        totalGrams: 0, 
+        massDetails: [] 
+      }
     }
 
     let totalMassCost = 0
@@ -88,11 +122,14 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
       massCost: 0,
       extrasCost: 0,
       suppliesCost: 0,
+      timeCost: 0,
+      totalMaterialCost: 0,
       totalCost: 0,
       totalGrams: 0,
       massDetails: []
     }
 
+    // Cálculo das massas
     candyMasses.forEach(massItem => {
       if (massItem.massName && massItem.grams) {
         const mass = masses.find(m => m.name === massItem.massName)
@@ -115,6 +152,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     costBreakdown.massCost = totalMassCost
     costBreakdown.totalGrams = totalGrams
 
+    // Cálculo dos extras
     let extrasCost = 0
     if (candy.extras && candy.extras.length > 0) {
       candy.extras.forEach(extra => {
@@ -135,6 +173,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     }
     costBreakdown.extrasCost = extrasCost
 
+    // Cálculo dos insumos
     let suppliesCost = 0
     if (candy.supplies && candy.supplies.length > 0) {
       candy.supplies.forEach(supplyId => {
@@ -146,7 +185,14 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     }
     costBreakdown.suppliesCost = suppliesCost
 
-    costBreakdown.totalCost = totalMassCost + extrasCost + suppliesCost
+    // CORREÇÃO: Cálculo do custo com tempo
+    const timeCost = calculateTimeCost(candy)
+    costBreakdown.timeCost = timeCost
+
+    const totalMaterialCost = totalMassCost + extrasCost + suppliesCost
+    costBreakdown.totalMaterialCost = totalMaterialCost
+    costBreakdown.totalCost = totalMaterialCost + timeCost
+    
     return costBreakdown
   }
 
@@ -164,8 +210,8 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
     return supply ? supply.name : 'Insumo não encontrado'
   }
 
-  const calculateSuggestedPrice = (cost) => {
-    return cost * 3
+  const calculateSuggestedPrice = (totalCost) => {
+    return totalCost * 3
   }
 
   if (candies.length === 0) {
@@ -193,7 +239,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
         const updateStatus = getUpdateStatus(daysSinceUpdate)
         const formattedUpdate = formatUpdateDate(candy.updatedAt)
 
-
         // Calcular margens
         const currentPrice = hasSalePrice ? parseFloat(candy.salePrice) : suggestedPrice
         const margins = calculateBothMargins(costBreakdown.totalCost, currentPrice)
@@ -217,13 +262,20 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                         {updateStatus.label}
                       </span>
 
-                      {/* Informações de data */}
+                      {/* Informações de tempo e data */}
                       <div className="flex flex-wrap items-center gap-4 text-xs md:text-sm mb-3">
                         <div className="flex items-center gap-1 text-white/70">
                           <FaCalendar className="w-3 h-3" />
                           <span>Última atualização:</span>
                           <span className="text-white">{formattedUpdate}</span>
                         </div>
+                        {candy.preparationTime && (
+                          <div className="flex items-center gap-1 text-white/70">
+                            <FaClock className="w-3 h-3" />
+                            <span>Tempo:</span>
+                            <span className="text-white">{candy.preparationTime}min</span>
+                          </div>
+                        )}
                         <div className="text-white/60">
                           {daysSinceUpdate !== 999 ? `Há ${daysSinceUpdate} dias` : 'Nunca atualizado'}
                         </div>
@@ -245,7 +297,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                         </div>
                       </div>
 
-                      {/* Custo Detalhado - ATUALIZADO PARA 2 CASAS DECIMAIS */}
+                      {/* Custo Detalhado - ATUALIZADO PARA MOSTRAR CUSTO COM TEMPO */}
                       <div className="space-y-1 text-xs md:text-sm">
                         <div className="flex justify-between">
                           <span className="text-white/70">Custo massa(s):</span>
@@ -266,8 +318,16 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                           </div>
                         )}
 
+                        {/* CORREÇÃO: Custo com tempo */}
+                        {costBreakdown.timeCost > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Custo com tempo:</span>
+                            <span className="text-green-400">R$ {costBreakdown.timeCost.toFixed(2)}</span>
+                          </div>
+                        )}
+
                         <div className="flex justify-between border-t border-white/20 pt-1">
-                          <span className="text-white font-semibold">Custo total:</span>
+                          <span className="text-white font-semibold">Custo total (materiais + tempo):</span>
                           <span className="text-primary-300 font-bold">
                             R$ {costBreakdown.totalCost.toFixed(2)} /un
                           </span>
@@ -293,7 +353,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                             <div className="text-green-200 text-xs mt-1">
                               Lucro: R$ {(parseFloat(candy.salePrice) - costBreakdown.totalCost).toFixed(2)}
                             </div>
-                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
                             <div className="text-green-200 text-xs">
                               Lucro: {margins.profitMargin}%
                             </div>
@@ -312,7 +371,6 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                             <div className="text-blue-200 text-xs mt-1">
                               Lucro: R$ {(suggestedPrice - costBreakdown.totalCost).toFixed(2)}
                             </div>
-                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
                             <div className="text-blue-200 text-xs">
                               Lucro: {margins.profitMargin}%
                             </div>
@@ -320,7 +378,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
                               Custo: {margins.costMargin}%
                             </div>
                             <div className="text-blue-300 text-xs mt-1 italic">
-                              (3x o custo)
+                              (3x o custo total)
                             </div>
                           </>
                         )}
@@ -396,7 +454,7 @@ export default function CandyList({ candies, masses, products, onEdit, onDelete 
               </div>
             )}
 
-            {/* Detalhes das Massas Individualmente - ATUALIZADO PARA 2 CASAS DECIMAIS */}
+            {/* Detalhes das Massas Individualmente */}
             {costBreakdown.massDetails.length > 1 && (
               <div className="mt-3 md:mt-4">
                 <h4 className="text-white/80 text-sm font-medium mb-2">Detalhes por Massa:</h4>

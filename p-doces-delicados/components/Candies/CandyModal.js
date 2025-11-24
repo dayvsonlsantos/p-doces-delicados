@@ -1,9 +1,9 @@
-// components/Candies/CandyModal.js (corrigido)
+// components/Candies/CandyModal.js (completo e ajustado)
 import Modal from '../UI/Modal'
 import Input from '../UI/Input'
 import GlassButton from '../UI/GlassButton'
 import { useState, useEffect } from 'react'
-import { FaTrash, FaSave, FaTimes, FaPlus, FaCalculator, FaChartLine } from 'react-icons/fa'
+import { FaTrash, FaSave, FaTimes, FaPlus, FaCalculator, FaChartLine, FaClock } from 'react-icons/fa'
 
 export default function CandyModal({ isOpen, onClose, onSave, candy, masses, products }) {
   const [formData, setFormData] = useState({
@@ -13,12 +13,35 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
     extras: [],
     supplies: [],
     profitMargin: 50,
-    salePrice: ''
+    salePrice: '',
+    preparationTime: 0 // em minutos
   })
 
   const [supplies, setSupplies] = useState([])
   const [loading, setLoading] = useState(false)
   const [profitInputType, setProfitInputType] = useState('percentage')
+  const [fixedCosts, setFixedCosts] = useState([])
+  const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
+
+  // Carregar custos fixos
+  useEffect(() => {
+    if (isOpen) {
+      loadFixedCosts()
+    }
+  }, [isOpen])
+
+  const loadFixedCosts = async () => {
+    try {
+      const response = await fetch('/api/fixed-costs')
+      const data = await response.json()
+      setFixedCosts(data)
+
+      const total = data.reduce((sum, cost) => sum + (parseFloat(cost.costPerMinute) || 0), 0)
+      setTotalCostPerMinute(total)
+    } catch (error) {
+      console.error('Erro ao carregar custos fixos:', error)
+    }
+  }
 
   // Carregar insumos quando o modal abrir
   useEffect(() => {
@@ -65,7 +88,8 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
         extras: candy.extras || [],
         supplies: candy.supplies || [],
         profitMargin: candy.profitMargin || 50,
-        salePrice: candy.salePrice || ''
+        salePrice: candy.salePrice || '',
+        preparationTime: candy.preparationTime || 0
       })
     } else {
       setFormData({
@@ -75,7 +99,8 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
         extras: [],
         supplies: [],
         profitMargin: 50,
-        salePrice: ''
+        salePrice: '',
+        preparationTime: 0
       })
     }
   }, [candy, isOpen])
@@ -118,7 +143,15 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
   // Função para calcular custo do docinho com múltiplas massas
   const calculateCandyCost = (candyData) => {
     if (!candyData.masses || candyData.masses.length === 0) {
-      return { massCost: 0, extrasCost: 0, suppliesCost: 0, totalCost: 0, totalGrams: 0 }
+      return { 
+        massCost: 0, 
+        extrasCost: 0, 
+        suppliesCost: 0, 
+        totalCost: 0, 
+        totalGrams: 0,
+        timeCost: 0,
+        totalCostWithTime: 0
+      }
     }
 
     let totalMassCost = 0
@@ -129,6 +162,8 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
       suppliesCost: 0,
       totalCost: 0,
       totalGrams: 0,
+      timeCost: 0,
+      totalCostWithTime: 0,
       massDetails: []
     }
 
@@ -189,7 +224,16 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
     }
     costBreakdown.suppliesCost = suppliesCost
 
-    costBreakdown.totalCost = totalMassCost + extrasCost + suppliesCost
+    // 4. CUSTO DO TEMPO DE PREPARO
+    const preparationTime = parseFloat(candyData.preparationTime) || 0
+    const timeCost = totalCostPerMinute * preparationTime
+    costBreakdown.timeCost = timeCost
+
+    // CUSTO TOTAL
+    const materialCost = totalMassCost + extrasCost + suppliesCost
+    costBreakdown.totalCost = materialCost
+    costBreakdown.totalCostWithTime = materialCost + timeCost
+
     return costBreakdown
   }
 
@@ -206,7 +250,7 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
   // Atualizar cálculos quando dados mudarem
   useEffect(() => {
     const costBreakdown = calculateCandyCost(formData)
-    const totalCost = costBreakdown.totalCost
+    const totalCost = costBreakdown.totalCostWithTime // Usar custo com tempo
 
     if (profitInputType === 'percentage' && formData.profitMargin) {
       const salePrice = calculateSalePrice(totalCost, parseFloat(formData.profitMargin))
@@ -228,7 +272,7 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
         candyGrams: costBreakdown.totalGrams.toFixed(2)
       }))
     }
-  }, [formData.masses, formData.extras, formData.supplies, formData.profitMargin, formData.salePrice, profitInputType])
+  }, [formData.masses, formData.extras, formData.supplies, formData.profitMargin, formData.salePrice, formData.preparationTime, profitInputType, totalCostPerMinute])
 
   // Funções para gerenciar múltiplas massas
   const addMass = () => {
@@ -314,6 +358,7 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
       candyGrams: parseFloat(formData.candyGrams) || 0,
       profitMargin: parseFloat(formData.profitMargin) || 50,
       salePrice: parseFloat(formData.salePrice) || 0,
+      preparationTime: parseFloat(formData.preparationTime) || 0,
       masses: validMasses.map(mass => ({
         ...mass,
         grams: parseFloat(mass.grams)
@@ -337,7 +382,7 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
       isOpen={isOpen}
       onClose={onClose}
       title={candy ? 'Editar Docinho' : 'Novo Docinho'}
-      size="lg" // Alterado para fullscreen no mobile
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-full">
         {/* Header fixo */}
@@ -367,7 +412,37 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
             required
           />
 
-          {/* Seção de Massas Múltiplas - LAYOUT MOBILE FIRST */}
+          {/* Tempo de Preparo */}
+          <div className="bg-white/5 rounded-2xl p-4">
+            <h3 className="text-white font-semibold text-lg mb-3 flex items-center gap-2">
+              <FaClock className="w-4 h-4" />
+              Tempo de Preparo
+            </h3>
+            <Input
+              label="Tempo de Preparo (minutos)"
+              type="number"
+              step="1"
+              min="0"
+              value={formData.preparationTime}
+              onChange={(e) => setFormData({ ...formData, preparationTime: e.target.value })}
+              placeholder="0"
+            />
+            {totalCostPerMinute > 0 && formData.preparationTime > 0 && (
+              <div className="mt-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-white/80">Custo do tempo:</span>
+                  <span className="text-blue-400 font-semibold">
+                    R$ {(totalCostPerMinute * parseFloat(formData.preparationTime)).toFixed(4)}
+                  </span>
+                </div>
+                <div className="text-white/60 text-xs mt-1">
+                  Custo por minuto: R$ {totalCostPerMinute.toFixed(8)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Seção de Massas Múltiplas */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -386,7 +461,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
             <div className="space-y-3">
               {formData.masses.map((mass, index) => (
                 <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header da massa */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white font-medium text-sm">
                       Massa {index + 1}
@@ -402,7 +476,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
                     )}
                   </div>
 
-                  {/* Campos da massa */}
                   <div className="space-y-3">
                     <div>
                       <label className="block text-white/60 text-xs mb-2">Massa</label>
@@ -457,7 +530,7 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
             )}
           </div>
 
-          {/* Seção de Extras - LAYOUT MOBILE FIRST */}
+          {/* Seção de Extras */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -476,7 +549,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
             <div className="space-y-3">
               {formData.extras.map((extra, index) => (
                 <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header do extra */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white font-medium text-sm">
                       Extra {index + 1}
@@ -490,7 +562,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
                     </button>
                   </div>
 
-                  {/* Campos do extra */}
                   <div className="space-y-3">
                     <div>
                       <label className="block text-white/60 text-xs mb-2">Produto</label>
@@ -532,7 +603,7 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
             </div>
           </div>
 
-          {/* Seção de Insumos - LAYOUT MOBILE FIRST */}
+          {/* Seção de Insumos */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -552,7 +623,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
             <div className="space-y-3">
               {formData.supplies.map((supplyId, index) => (
                 <div key={index} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  {/* Header do insumo */}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white font-medium text-sm">
                       Insumo {index + 1}
@@ -566,7 +636,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
                     </button>
                   </div>
 
-                  {/* Campo do insumo */}
                   <div>
                     <label className="block text-white/60 text-xs mb-2">Insumo</label>
                     <select
@@ -670,9 +739,21 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
                   </div>
                 )}
 
+                {costBreakdown.timeCost > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-white/80">Custo do tempo ({formData.preparationTime} min):</span>
+                    <span className="text-purple-400">R$ {costBreakdown.timeCost.toFixed(4)}</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between border-t border-white/20 pt-2">
-                  <span className="text-white font-semibold">Custo total:</span>
+                  <span className="text-white font-semibold">Custo dos materiais:</span>
                   <span className="text-white font-bold">R$ {costBreakdown.totalCost.toFixed(4)}</span>
+                </div>
+
+                <div className="flex justify-between border-t border-white/20 pt-2">
+                  <span className="text-white font-semibold">Custo total (com tempo):</span>
+                  <span className="text-green-400 font-bold">R$ {costBreakdown.totalCostWithTime.toFixed(4)}</span>
                 </div>
 
                 {formData.salePrice && (
@@ -684,13 +765,13 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
                     <div className="flex justify-between">
                       <span className="text-white/80">Lucro por unidade:</span>
                       <span className="text-green-400 font-semibold">
-                        R$ {(parseFloat(formData.salePrice) - costBreakdown.totalCost).toFixed(2)}
+                        R$ {(parseFloat(formData.salePrice) - costBreakdown.totalCostWithTime).toFixed(2)}
                       </span>
                     </div>
 
-                    {/* NOVA SEÇÃO: MARGEM DE CUSTO E LUCRO */}
+                    {/* MARGEM DE CUSTO E LUCRO */}
                     {(() => {
-                      const margins = calculateBothMargins(costBreakdown.totalCost, parseFloat(formData.salePrice));
+                      const margins = calculateBothMargins(costBreakdown.totalCostWithTime, parseFloat(formData.salePrice));
                       return (
                         <>
                           <div className="flex justify-between">
@@ -705,7 +786,6 @@ export default function CandyModal({ isOpen, onClose, onSave, candy, masses, pro
                       );
                     })()}
 
-                    {/* Linha antiga (mantida para compatibilidade) */}
                     <div className="flex justify-between border-t border-white/20 pt-2">
                       <span className="text-white/80">Margem Markup:</span>
                       <span className="text-green-400 font-semibold">{formData.profitMargin}%</span>

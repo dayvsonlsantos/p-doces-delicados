@@ -1,13 +1,13 @@
-// components/Cakes/CakeList.js (com margem de custo)
+// components/Cakes/CakeList.js (com custo de tempo)
 import GlassButton from '../UI/GlassButton'
-import { FaEdit, FaTrash, FaBirthdayCake } from 'react-icons/fa'
+import { FaEdit, FaTrash, FaBirthdayCake, FaSync, FaCalendar, FaClock } from 'react-icons/fa'
 import { useState, useEffect } from 'react'
 
 // Função para calcular ambas as margens
-const calculateBothMargins = (cost, salePrice) => {
-  if (cost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
+const calculateBothMargins = (totalCost, salePrice) => {
+  if (totalCost === 0 || salePrice === 0) return { costMargin: 0, profitMargin: 0 };
 
-  const costMargin = (cost / salePrice) * 100;
+  const costMargin = (totalCost / salePrice) * 100;
   const profitMargin = 100 - costMargin;
 
   return {
@@ -18,9 +18,12 @@ const calculateBothMargins = (cost, salePrice) => {
 
 export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, supplies, onEdit, onDelete }) {
   const [suppliesList, setSuppliesList] = useState([])
+  const [fixedCosts, setFixedCosts] = useState([])
+  const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
 
   useEffect(() => {
     loadSupplies()
+    loadFixedCosts()
   }, [])
 
   const loadSupplies = async () => {
@@ -30,6 +33,19 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
       setSuppliesList(data)
     } catch (error) {
       console.error('Erro ao carregar insumos:', error)
+    }
+  }
+
+  const loadFixedCosts = async () => {
+    try {
+      const response = await fetch('/api/fixed-costs')
+      const data = await response.json()
+      setFixedCosts(data)
+
+      const total = data.reduce((sum, cost) => sum + (parseFloat(cost.costPerMinute) || 0), 0)
+      setTotalCostPerMinute(total)
+    } catch (error) {
+      console.error('Erro ao carregar custos fixos:', error)
     }
   }
 
@@ -77,30 +93,40 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
     return totalCost
   }
 
+  // Calcular custo com tempo (mão de obra)
+  const calculateTimeCost = (cake) => {
+    if (!cake.preparationTime || totalCostPerMinute === 0) return 0
+
+    const preparationTime = parseFloat(cake.preparationTime) || 0
+    return totalCostPerMinute * preparationTime
+  }
+
+  // CORREÇÃO: Função principal de cálculo do custo do bolo
   const calculateCakeCost = (cake) => {
-    let totalCost = 0
+    let materialCost = 0
     const costBreakdown = {
       massCost: 0,
       frostingCost: 0,
       suppliesCost: 0,
+      timeCost: 0,
+      totalMaterialCost: 0,
       totalCost: 0,
       massDetails: [],
       frostingDetails: []
     }
 
-    // Cálculo das massas - CORREÇÃO: Buscar o custo calculado da massa
+    // Cálculo das massas
     if (cake.masses) {
       cake.masses.forEach(massItem => {
         const mass = cakeMasses.find(m => m.name === massItem.massName)
         if (mass && massItem.grams) {
-          // CORREÇÃO: Buscar o custo total da massa ou calcular na hora
           const massTotalCost = mass.cost || calculateMassCost(mass)
           const massCostPerGram = massTotalCost / mass.totalGrams
           const massGrams = parseFloat(massItem.grams)
           const massCost = massCostPerGram * massGrams
 
           costBreakdown.massCost += massCost
-          totalCost += massCost
+          materialCost += massCost
           costBreakdown.massDetails.push({
             massName: massItem.massName,
             grams: massGrams,
@@ -113,7 +139,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
       })
     }
 
-    // Cálculo das coberturas - CORREÇÃO: Mesma lógica para coberturas
+    // Cálculo das coberturas
     if (cake.frostings) {
       cake.frostings.forEach(frostingItem => {
         const frosting = cakeFrostings.find(f => f.name === frostingItem.frostingName)
@@ -124,7 +150,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
           const frostingCost = frostingCostPerGram * frostingGrams
 
           costBreakdown.frostingCost += frostingCost
-          totalCost += frostingCost
+          materialCost += frostingCost
           costBreakdown.frostingDetails.push({
             frostingName: frostingItem.frostingName,
             grams: frostingGrams,
@@ -143,12 +169,18 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
         const supply = suppliesList.find(s => s._id === supplyId)
         if (supply) {
           costBreakdown.suppliesCost += supply.cost
-          totalCost += supply.cost
+          materialCost += supply.cost
         }
       })
     }
 
-    costBreakdown.totalCost = totalCost
+    // CORREÇÃO: Cálculo do custo com tempo
+    const timeCost = calculateTimeCost(cake)
+    costBreakdown.timeCost = timeCost
+
+    costBreakdown.totalMaterialCost = materialCost
+    costBreakdown.totalCost = materialCost + timeCost
+
     return costBreakdown
   }
 
@@ -165,8 +197,8 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
     return supply ? supply.name : 'Insumo não encontrado'
   }
 
-  const calculateSuggestedPrice = (cost) => {
-    return cost * 3
+  const calculateSuggestedPrice = (totalCost) => {
+    return totalCost * 3
   }
 
   if (cakes.length === 0) {
@@ -189,6 +221,10 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
         const hasSalePrice = cake.salePrice && parseFloat(cake.salePrice) > 0
         const totalGrams = (costBreakdown.massDetails.reduce((sum, m) => sum + m.grams, 0) +
           costBreakdown.frostingDetails.reduce((sum, f) => sum + f.grams, 0))
+
+        // CORREÇÃO: Calcular as margens aqui
+        const currentPrice = hasSalePrice ? parseFloat(cake.salePrice) : suggestedPrice
+        const margins = calculateBothMargins(costBreakdown.totalCost, currentPrice)
 
         // Datas
         const daysSinceUpdate = getDaysSinceUpdate(cake.updatedAt)
@@ -221,13 +257,20 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                         <p className="text-white/60 text-xs md:text-sm mb-3 line-clamp-2">{cake.description}</p>
                       )}
 
-                      {/* Informações de data */}
+                      {/* Informações de tempo e data */}
                       <div className="flex flex-wrap items-center gap-4 text-xs md:text-sm mb-3">
                         <div className="flex items-center gap-1 text-white/70">
                           <FaCalendar className="w-3 h-3" />
                           <span>Última atualização:</span>
                           <span className="text-white">{formattedUpdate}</span>
                         </div>
+                        {cake.preparationTime && (
+                          <div className="flex items-center gap-1 text-white/70">
+                            <FaClock className="w-3 h-3" />
+                            <span>Tempo:</span>
+                            <span className="text-white">{cake.preparationTime}min</span>
+                          </div>
+                        )}
                         <div className="text-white/60">
                           {daysSinceUpdate !== 999 ? `Há ${daysSinceUpdate} dias` : 'Nunca atualizado'}
                         </div>
@@ -292,8 +335,16 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                           </div>
                         )}
 
+                        {/* Custo com tempo */}
+                        {costBreakdown.timeCost > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Custo com tempo:</span>
+                            <span className="text-green-400">R$ {costBreakdown.timeCost.toFixed(2)}</span>
+                          </div>
+                        )}
+
                         <div className="flex justify-between border-t border-white/20 pt-1">
-                          <span className="text-white font-semibold">Custo total:</span>
+                          <span className="text-white font-semibold">Custo total (materiais + tempo):</span>
                           <span className="text-primary-300 font-bold">
                             R$ {costBreakdown.totalCost.toFixed(2)}
                           </span>
@@ -319,7 +370,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <div className="text-green-200 text-xs mt-1">
                               Lucro: R$ {(parseFloat(cake.salePrice) - costBreakdown.totalCost).toFixed(2)}
                             </div>
-                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
+                            {/* CORREÇÃO: Agora margins está definido */}
                             <div className="text-green-200 text-xs">
                               Lucro: {margins.profitMargin}%
                             </div>
@@ -338,7 +389,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                             <div className="text-blue-200 text-xs mt-1">
                               Lucro: R$ {(suggestedPrice - costBreakdown.totalCost).toFixed(2)}
                             </div>
-                            {/* NOVA LINHA: MARGEM DE CUSTO E LUCRO */}
+                            {/* CORREÇÃO: Agora margins está definido */}
                             <div className="text-blue-200 text-xs">
                               Lucro: {margins.profitMargin}%
                             </div>
@@ -346,7 +397,7 @@ export default function CakeList({ cakes, cakeMasses, cakeFrostings, products, s
                               Custo: {margins.costMargin}%
                             </div>
                             <div className="text-blue-300 text-xs mt-1 italic">
-                              (3x o custo)
+                              (3x o custo total)
                             </div>
                           </>
                         )}

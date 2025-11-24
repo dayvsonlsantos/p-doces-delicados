@@ -1,3 +1,4 @@
+// components/Layout/Layout.js (atualizado)
 import Header from './Header'
 import Sidebar from './Sidebar'
 import { useEffect, useState } from 'react'

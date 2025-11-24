@@ -1,9 +1,9 @@
-// pages/batch.js - completo com unidades corrigidas e margem de lucro
+// pages/batch.js - COMPLETO COM CUSTO FIXO
 import Layout from '../../../components/Layout/Layout'
 import GlassCard from '../../../components/UI/GlassCard'
 import GlassButton from '../../../components/UI/GlassButton'
 import { useState, useEffect, useRef } from 'react'
-import { FaCalculator, FaPlus, FaMinus, FaPrint, FaChevronDown, FaChevronUp, FaDownload } from 'react-icons/fa'
+import { FaCalculator, FaPlus, FaMinus, FaChevronDown, FaChevronUp, FaDownload, FaClock } from 'react-icons/fa'
 import html2canvas from 'html2canvas'
 
 // Funções de conversão de unidades
@@ -77,11 +77,14 @@ export default function BatchCalculator() {
     masses: false,
     summary: false
   })
+  const [fixedCosts, setFixedCosts] = useState([])
+  const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
 
   const resultsRef = useRef(null)
 
   useEffect(() => {
     loadData()
+    loadFixedCosts()
   }, [])
 
   const loadData = async () => {
@@ -102,6 +105,19 @@ export default function BatchCalculator() {
     }
   }
 
+  const loadFixedCosts = async () => {
+    try {
+      const response = await fetch('/api/fixed-costs')
+      const data = await response.json()
+      setFixedCosts(data)
+
+      const total = data.reduce((sum, cost) => sum + (parseFloat(cost.costPerMinute) || 0), 0)
+      setTotalCostPerMinute(total)
+    } catch (error) {
+      console.error('Erro ao carregar custos fixos:', error)
+    }
+  }
+
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -116,7 +132,28 @@ export default function BatchCalculator() {
     }))
   }
 
-  // Função para calcular ingredientes totais de uma massa com unidades CORRIGIDA
+  // Função para calcular custo com tempo
+  const calculateTimeCost = (candy) => {
+    if (!candy.preparationTime || totalCostPerMinute === 0) return 0
+    
+    const preparationTime = parseFloat(candy.preparationTime) || 0
+    return totalCostPerMinute * preparationTime
+  }
+
+  // Função para calcular custo total do docinho
+  const calculateCandyCost = (candy) => {
+    const materialCost = candy.costPerUnit || 0
+    const timeCost = calculateTimeCost(candy)
+    const totalCost = materialCost + timeCost
+
+    return {
+      materialCost,
+      timeCost,
+      totalCost
+    }
+  }
+
+  // Função para calcular ingredientes totais de uma massa
   const calculateMassIngredients = (mass, totalGrams) => {
     const scaleFactor = totalGrams / mass.totalGrams
     const ingredients = {}
@@ -127,7 +164,6 @@ export default function BatchCalculator() {
         let scaledGrams = ingredient.grams * scaleFactor
         
         if (product.unit === 'un') {
-          // Para unidades, calcula quantas unidades inteiras são necessárias
           const unitWeight = product.unitWeight || 50
           const units = Math.ceil(scaledGrams / unitWeight)
           if (units > 0) {
@@ -138,7 +174,6 @@ export default function BatchCalculator() {
             }
           }
         } else {
-          // Para outros, aplica arredondamento e converte para unidade de display
           scaledGrams = roundGrams(scaledGrams)
           if (scaledGrams >= 0.5) {
             const displayUnit = getDisplayUnit(product.unit)
@@ -159,6 +194,8 @@ export default function BatchCalculator() {
   const calculateBatch = () => {
     const candyDetails = []
     const massGroups = {}
+    let totalMaterialCost = 0
+    let totalTimeCost = 0
     let totalCost = 0
     let totalRevenue = 0
     let totalProfit = 0
@@ -168,19 +205,27 @@ export default function BatchCalculator() {
       if (quantity > 0) {
         const candy = candies.find(c => c._id === candyId)
         if (candy) {
-          const candyCost = candy.costPerUnit || 0
+          const costBreakdown = calculateCandyCost(candy)
+          const candyMaterialCost = costBreakdown.materialCost * quantity
+          const candyTimeCost = costBreakdown.timeCost
+          const candyTotalCost = costBreakdown.totalCost * quantity
+          
           const candyRevenue = candy.salePrice ? parseFloat(candy.salePrice) * quantity : 0
-          const candyProfit = candyRevenue - (candyCost * quantity)
+          const candyProfit = candyRevenue - candyTotalCost
 
           candyDetails.push({
             candy,
             quantity,
-            totalCost: candyCost * quantity,
+            materialCost: candyMaterialCost,
+            timeCost: candyTimeCost,
+            totalCost: candyTotalCost,
             totalRevenue: candyRevenue,
             totalProfit: candyProfit
           })
 
-          totalCost += candyCost * quantity
+          totalMaterialCost += candyMaterialCost
+          totalTimeCost += candyTimeCost
+          totalCost += candyTotalCost
           totalRevenue += candyRevenue
           totalProfit += candyProfit
 
@@ -217,6 +262,8 @@ export default function BatchCalculator() {
     setCalculations({
       candyDetails,
       massGroups,
+      totalMaterialCost: totalMaterialCost.toFixed(2),
+      totalTimeCost: totalTimeCost.toFixed(2),
       totalCost: totalCost.toFixed(2),
       totalRevenue: totalRevenue.toFixed(2),
       totalProfit: totalProfit.toFixed(2)
@@ -267,11 +314,19 @@ export default function BatchCalculator() {
         </div>
       </div>
 
-      {/* Resumo Financeiro com Margem */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      {/* Resumo Financeiro com Margem ATUALIZADO */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-blue-500/10 rounded-xl">
         <div className="text-center">
-          <p className="text-orange-300 text-xs font-semibold">Custo Total</p>
-          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+          <p className="text-orange-300 text-xs font-semibold">Custo Materiais</p>
+          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalMaterialCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-purple-300 text-xs font-semibold">Custo Tempo</p>
+          <p className="text-purple-400 text-lg font-bold">R$ {calculations.totalTimeCost}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-red-300 text-xs font-semibold">Custo Total</p>
+          <p className="text-red-400 text-lg font-bold">R$ {calculations.totalCost}</p>
         </div>
         <div className="text-center">
           <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
@@ -281,49 +336,64 @@ export default function BatchCalculator() {
           <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
           <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
         </div>
-        <div className="text-center">
-          <p className="text-purple-300 text-xs font-semibold">Margem</p>
-          <p className="text-purple-400 text-lg font-bold">
-            {calculations.totalRevenue > 0 
-              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-              : '0'
-            }%
-          </p>
-          <p className="text-purple-300 text-xs">
-            Custo: {calculations.totalRevenue > 0 
-              ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-              : '0'
-            }%
-          </p>
-        </div>
       </div>
 
-      {/* Docinhos do Lote - SEMPRE ABERTO no PNG */}
+      {/* Margem de Lucro */}
+      <div className="text-center p-3 bg-purple-500/10 rounded-xl">
+        <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
+        <p className="text-purple-400 text-xl font-bold">
+          {calculations.totalRevenue > 0 
+            ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+            : '0'
+          }%
+        </p>
+        <p className="text-purple-300 text-xs">
+          Custo: {calculations.totalRevenue > 0 
+            ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+            : '0'
+          }%
+        </p>
+      </div>
+
+      {/* Docinhos do Lote - ATUALIZADO com custo fixo */}
       <div>
         <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
           Docinhos do Lote ({calculations.candyDetails.length})
         </h4>
         <div className="space-y-2">
           {calculations.candyDetails.map((item, idx) => {
-            const marginInfo = calculateProfitMargin(item.candy.costPerUnit || 0, item.candy.salePrice || 0);
+            const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
             
             return (
-              <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                <div className="flex-1">
-                  <span className="text-white font-medium text-sm">{item.candy.name}</span>
-                  <div className="text-white/60 text-xs">
-                    {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+              <div key={idx} className="p-3 rounded-lg bg-white/5">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <span className="text-white font-medium text-sm">{item.candy.name}</span>
+                    <div className="text-white/60 text-xs">
+                      {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un
+                    </div>
                   </div>
-                  <div className="text-xs text-purple-400 mt-1">
-                    Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                  <div className="text-right">
+                    <div className="text-green-400 font-semibold text-sm">
+                      R$ {item.totalRevenue.toFixed(2)}
+                    </div>
+                    <div className="text-green-300 text-xs">
+                      Lucro: R$ {item.totalProfit.toFixed(2)}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-green-400 font-semibold text-sm">
-                    R$ {item.totalRevenue.toFixed(2)}
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-center">
+                    <p className="text-orange-400">Materiais</p>
+                    <p className="text-orange-300">R$ {item.materialCost.toFixed(2)}</p>
                   </div>
-                  <div className="text-green-300 text-xs">
-                    Lucro: R$ {item.totalProfit.toFixed(2)}
+                  <div className="text-center">
+                    <p className="text-purple-400">Tempo</p>
+                    <p className="text-purple-300">R$ {item.timeCost.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-blue-400">Margem</p>
+                    <p className="text-blue-300">{marginInfo.profitMargin}%</p>
                   </div>
                 </div>
               </div>
@@ -410,7 +480,7 @@ export default function BatchCalculator() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Seleção de Docinhos */}
+        {/* Seleção de Docinhos - ATUALIZADO */}
         <GlassCard>
           <h2 className="text-xl md:text-2xl font-bold text-primary mb-4 flex items-center gap-2">
             <FaCalculator />
@@ -418,45 +488,71 @@ export default function BatchCalculator() {
           </h2>
 
           <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-            {candies.map(candy => (
-              <div key={candy._id} className="flex items-center flex-col md:flex-row justify-between p-4 rounded-2xl bg-white/5 dark:bg-gray-800/50">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-primary">{candy.name}</h3>
-                  <p className="text-secondary text-sm">
-                    {candy.candyGrams}g • {candy.masses ? `${candy.masses.length} massa(s)` : '1 massa'}
-                  </p>
-                  {candy.salePrice && (
-                    <p className="text-green-500 text-sm font-semibold">
-                      Venda: R$ {parseFloat(candy.salePrice).toFixed(2)}
+            {candies.map(candy => {
+              const costBreakdown = calculateCandyCost(candy)
+              const candySalePrice = candy.salePrice || (costBreakdown.totalCost * 3)
+              
+              return (
+                <div key={candy._id} className="flex items-center flex-col md:flex-row justify-between p-4 rounded-2xl bg-white/5">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-primary">{candy.name}</h3>
+                    <p className="text-secondary text-sm">
+                      {candy.candyGrams}g • {candy.masses ? `${candy.masses.length} massa(s)` : '1 massa'}
+                      {candy.preparationTime > 0 && (
+                        <span className="text-purple-400 ml-2">
+                          • {candy.preparationTime}min
+                        </span>
+                      )}
                     </p>
-                  )}
+                    <div className="text-xs space-y-1 mt-1">
+                      <div className="flex justify-between">
+                        <span className="text-orange-400">Materiais:</span>
+                        <span className="text-orange-300">R$ {costBreakdown.materialCost.toFixed(2)}</span>
+                      </div>
+                      {costBreakdown.timeCost > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-purple-400">Custo Tempo:</span>
+                          <span className="text-purple-300">R$ {costBreakdown.timeCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t border-white/20 pt-1">
+                        <span className="text-white font-semibold">Total:</span>
+                        <span className="text-white font-bold">R$ {costBreakdown.totalCost.toFixed(2)}</span>
+                      </div>
+                      {candy.salePrice && (
+                        <p className="text-green-500 font-semibold">
+                          Venda: R$ {candySalePrice.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 md:mt-0 flex items-center gap-2">
+                    <button
+                      onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) - 1)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
+                    >
+                      <FaMinus size={12} />
+                    </button>
+
+                    <input
+                      type="number"
+                      value={selectedCandies[candy._id] || 0}
+                      onChange={(e) => updateQuantity(candy._id, parseInt(e.target.value) || 0)}
+                      className="w-16 text-center glass-input"
+                      min="0"
+                    />
+
+                    <button
+                      onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) + 1)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/20 text-green-500 hover:bg-green-500/30 transition-colors"
+                    >
+                      <FaPlus size={12} />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="mt-2 md:mt-0 flex items-center gap-2">
-                  <button
-                    onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) - 1)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
-                  >
-                    <FaMinus size={12} />
-                  </button>
-
-                  <input
-                    type="number"
-                    value={selectedCandies[candy._id] || 0}
-                    onChange={(e) => updateQuantity(candy._id, parseInt(e.target.value) || 0)}
-                    className="w-16 text-center glass-input"
-                    min="0"
-                  />
-
-                  <button
-                    onClick={() => updateQuantity(candy._id, (selectedCandies[candy._id] || 0) + 1)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/20 text-green-500 hover:bg-green-500/30 transition-colors"
-                  >
-                    <FaPlus size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <GlassButton
@@ -469,7 +565,7 @@ export default function BatchCalculator() {
           </GlassButton>
         </GlassCard>
 
-        {/* Resultados */}
+        {/* Resultados - ATUALIZADO */}
         <GlassCard>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl md:text-2xl font-bold text-primary">Resultados do Lote</h2>
@@ -485,7 +581,7 @@ export default function BatchCalculator() {
 
           {calculations ? (
             <div className="space-y-4">
-              {/* Resumo Financeiro com Margem */}
+              {/* Resumo Financeiro ATUALIZADO */}
               <div
                 className="cursor-pointer"
                 onClick={() => toggleSection('summary')}
@@ -497,23 +593,40 @@ export default function BatchCalculator() {
               </div>
 
               {expandedSections.summary && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white/5 rounded-2xl">
-                  <div className="text-center">
-                    <p className="text-orange-300 text-sm font-semibold">Custo Total</p>
-                    <p className="text-orange-400 text-2xl font-bold">R$ {calculations.totalCost}</p>
+                <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
+                  {/* Grid de Custos Detalhados */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-orange-500/10 rounded-xl">
+                      <p className="text-orange-300 text-sm font-semibold">Custo Materiais</p>
+                      <p className="text-orange-400 text-2xl font-bold">R$ {calculations.totalMaterialCost}</p>
+                    </div>
+
+                    <div className="text-center p-3 bg-purple-500/10 rounded-xl">
+                      <p className="text-purple-300 text-sm font-semibold">Custo Tempo</p>
+                      <p className="text-purple-400 text-2xl font-bold">R$ {calculations.totalTimeCost}</p>
+                    </div>
+
+                    <div className="text-center p-3 bg-red-500/10 rounded-xl">
+                      <p className="text-red-300 text-sm font-semibold">Custo Total</p>
+                      <p className="text-red-400 text-2xl font-bold">R$ {calculations.totalCost}</p>
+                    </div>
                   </div>
 
-                  <div className="text-center">
-                    <p className="text-blue-300 text-sm font-semibold">Receita Total</p>
-                    <p className="text-blue-400 text-2xl font-bold">R$ {calculations.totalRevenue}</p>
+                  {/* Grid de Receita e Lucro */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-500/10 rounded-xl">
+                      <p className="text-blue-300 text-sm font-semibold">Receita Total</p>
+                      <p className="text-blue-400 text-2xl font-bold">R$ {calculations.totalRevenue}</p>
+                    </div>
+
+                    <div className="text-center p-3 bg-green-500/10 rounded-xl">
+                      <p className="text-green-300 text-sm font-semibold">Lucro Total</p>
+                      <p className="text-green-400 text-2xl font-bold">R$ {calculations.totalProfit}</p>
+                    </div>
                   </div>
 
-                  <div className="text-center">
-                    <p className="text-green-300 text-sm font-semibold">Lucro Total</p>
-                    <p className="text-green-400 text-2xl font-bold">R$ {calculations.totalProfit}</p>
-                  </div>
-
-                  <div className="text-center">
+                  {/* Margem de Lucro */}
+                  <div className="text-center p-3 bg-purple-500/10 rounded-xl">
                     <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
                     <p className="text-purple-400 text-2xl font-bold">
                       {calculations.totalRevenue > 0 
@@ -545,14 +658,26 @@ export default function BatchCalculator() {
               {expandedSections.candies && (
                 <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
                   {calculations.candyDetails.map((item, idx) => {
-                    const marginInfo = calculateProfitMargin(item.candy.costPerUnit || 0, item.candy.salePrice || 0);
+                    const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
                     
                     return (
                       <div key={idx} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
                         <div>
                           <span className="text-primary font-semibold">{item.candy.name}</span>
                           <div className="text-secondary text-xs">
-                            {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo
+                            {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo total
+                          </div>
+                          <div className="text-xs space-y-1 mt-1">
+                            <div className="flex justify-between">
+                              <span className="text-orange-400">Materiais:</span>
+                              <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                            </div>
+                            {item.timeCost > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-purple-400">Tempo:</span>
+                                <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
+                              </div>
+                            )}
                           </div>
                           <div className="text-xs text-purple-400 mt-1">
                             Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)

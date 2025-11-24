@@ -1,4 +1,4 @@
-// components/Layout/Sidebar.js
+// components/Layout/Sidebar.js (atualizado)
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -6,7 +6,9 @@ import {
   FaHome, FaBox, FaWeight, FaCookie, FaTag,
   FaBirthdayCake, FaChevronDown, FaChevronRight,
   FaIceCream, FaCalculator,
-  FaClipboardList
+  FaClipboardList,
+  FaCog,
+  FaBullseye // NOVO ícone para Metas
 } from 'react-icons/fa'
 import { useState } from 'react'
 import Image from 'next/image'
@@ -56,6 +58,20 @@ export default function Sidebar({ activePage, onClose }) {
       type: 'single'
     },
     {
+      id: 'goals', // NOVA SEÇÃO
+      name: 'Metas',
+      path: '/goals',
+      icon: FaBullseye,
+      type: 'single'
+    },
+    {
+      id: 'fixed-costs',
+      name: 'Custos Fixos',
+      path: '/fixed-costs',
+      icon: FaCog,
+      type: 'single'
+    },
+    {
       id: 'candies',
       name: 'Docinhos',
       icon: FaCookie,
@@ -86,7 +102,9 @@ export default function Sidebar({ activePage, onClose }) {
       FaCookie: FaCookie,
       FaCalculator: FaCalculator,
       FaIceCream: FaIceCream,
-      FaBirthdayCake: FaBirthdayCake
+      FaBirthdayCake: FaBirthdayCake,
+      FaCog: FaCog,
+      FaBullseye: FaBullseye // NOVO
     }
     return icons[iconName] || FaWeight
   }

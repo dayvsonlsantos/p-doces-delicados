@@ -1,4 +1,4 @@
-// components/Cakes/CakeFrostingModal.js (corrigido radicalmente)
+// components/Cakes/CakeFrostingModal.js (corrigido)
 import Modal from '../UI/Modal'
 import Input from '../UI/Input'
 import GlassButton from '../UI/GlassButton'
@@ -13,21 +13,32 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
     ingredients: [{ productId: '', grams: '' }]
   })
 
+  // Estado para controlar se é uma edição em andamento
+  const [isEditing, setIsEditing] = useState(false)
+
   useEffect(() => {
-    if (frosting) {
-      setFormData({
-        name: frosting.name || '',
-        totalGrams: frosting.totalGrams || '',
-        yieldCakes: frosting.yieldCakes || '1',
-        ingredients: frosting.ingredients || [{ productId: '', grams: '' }]
-      })
-    } else {
-      setFormData({ 
-        name: '', 
-        totalGrams: '', 
-        yieldCakes: '1',
-        ingredients: [{ productId: '', grams: '' }] 
-      })
+    if (isOpen) {
+      if (frosting) {
+        setFormData({
+          name: frosting.name || '',
+          totalGrams: frosting.totalGrams?.toString() || '',
+          yieldCakes: frosting.yieldCakes?.toString() || '1',
+          ingredients: frosting.ingredients?.length > 0 
+            ? frosting.ingredients.map(ing => ({
+                productId: ing.productId || '',
+                grams: ing.grams?.toString() || ''
+              }))
+            : [{ productId: '', grams: '' }]
+        })
+      } else {
+        setFormData({ 
+          name: '', 
+          totalGrams: '', 
+          yieldCakes: '1',
+          ingredients: [{ productId: '', grams: '' }] 
+        })
+      }
+      setIsEditing(false)
     }
   }, [frosting, isOpen])
 
@@ -36,17 +47,20 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
       ...formData,
       ingredients: [...formData.ingredients, { productId: '', grams: '' }]
     })
+    setIsEditing(true)
   }
 
   const removeIngredient = (index) => {
     const newIngredients = formData.ingredients.filter((_, i) => i !== index)
     setFormData({ ...formData, ingredients: newIngredients })
+    setIsEditing(true)
   }
 
   const updateIngredient = (index, field, value) => {
     const newIngredients = [...formData.ingredients]
     newIngredients[index][field] = value
     setFormData({ ...formData, ingredients: newIngredients })
+    setIsEditing(true)
   }
 
   const calculateGramsPerCake = () => {
@@ -83,6 +97,22 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
     }
     
     onSave(frostingData)
+    setIsEditing(false)
+  }
+
+  const handleClose = () => {
+    if (isEditing) {
+      const confirmClose = window.confirm(
+        'Você tem alterações não salvas. Deseja realmente cancelar?'
+      )
+      if (!confirmClose) return
+    }
+    onClose()
+  }
+
+  const handleInputChange = (field, value) => {
+    setFormData({ ...formData, [field]: value })
+    setIsEditing(true)
   }
 
   const totalIngredientGrams = formData.ingredients.reduce((sum, ing) => sum + (parseFloat(ing.grams) || 0), 0)
@@ -91,9 +121,9 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={frosting ? 'Editar Cobertura' : 'Nova Cobertura'}
-      size="lg" // Alterado para fullscreen no mobile
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-full">
         {/* Header fixo */}
@@ -101,6 +131,11 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
           <h2 className="text-xl font-bold text-white text-center">
             {frosting ? 'Editar Cobertura' : 'Nova Cobertura'}
           </h2>
+          {isEditing && (
+            <div className="text-yellow-400 text-sm text-center mt-1">
+              • Você tem alterações não salvas
+            </div>
+          )}
         </div>
 
         {/* Conteúdo com scroll */}
@@ -120,7 +155,7 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
             <Input
               label="Nome da Cobertura"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => handleInputChange('name', e.target.value)}
               placeholder="Ex: Cobertura de Chocolate"
               required
             />
@@ -132,7 +167,7 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
                 step="0.01"
                 min="0"
                 value={formData.totalGrams}
-                onChange={(e) => setFormData({ ...formData, totalGrams: e.target.value })}
+                onChange={(e) => handleInputChange('totalGrams', e.target.value)}
                 placeholder="800.00"
                 required
               />
@@ -143,7 +178,7 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
                 step="1"
                 min="1"
                 value={formData.yieldCakes}
-                onChange={(e) => setFormData({ ...formData, yieldCakes: e.target.value })}
+                onChange={(e) => handleInputChange('yieldCakes', e.target.value)}
                 placeholder="1"
                 required
               />
@@ -162,7 +197,7 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
             </div>
           )}
 
-          {/* Seção de Ingredientes - LAYOUT MOBILE FIRST */}
+          {/* Seção de Ingredientes */}
           <div className="bg-white/5 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -249,7 +284,7 @@ export default function CakeFrostingModal({ isOpen, onClose, onSave, frosting, p
             <GlassButton
               type="button"
               variant="secondary"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 h-12"
             >
               <FaTimes className="w-4 h-4" />
