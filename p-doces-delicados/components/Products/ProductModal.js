@@ -18,6 +18,14 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
 
   useEffect(() => {
     if (product) {
+      // CORREÇÃO: Converter a data do MongoDB para o fuso horário local
+      let purchaseDate = new Date().toISOString().split('T')[0]
+      if (product.purchaseDate) {
+        const date = new Date(product.purchaseDate)
+        // Ajusta para o fuso horário local
+        purchaseDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+      }
+
       setFormData({
         name: product.name || '',
         unit: product.unit || 'g',
@@ -25,7 +33,7 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
         cost: product.cost || '',
         unitCost: product.unitCost || '0.00',
         baseUnitCost: product.baseUnitCost || '0.00',
-        purchaseDate: product.purchaseDate ? new Date(product.purchaseDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        purchaseDate: purchaseDate
       })
     } else {
       setFormData({
@@ -35,7 +43,7 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
         cost: '',
         unitCost: '0.00',
         baseUnitCost: '0.00',
-        purchaseDate: new Date().toISOString().split('T')[0] // Data atual como padrão
+        purchaseDate: new Date().toISOString().split('T')[0]
       })
     }
   }, [product, isOpen])
@@ -48,18 +56,22 @@ export default function ProductModal({ isOpen, onClose, onSave, product }) {
       return
     }
 
+    // CORREÇÃO: Criar a data no fuso horário UTC para evitar problemas
+    const purchaseDate = new Date(formData.purchaseDate + 'T12:00:00Z') // Meio-dia UTC
+
     const productData = {
       ...formData,
       quantity: parseFloat(formData.quantity),
       cost: parseFloat(formData.cost),
       unitCost: parseFloat(formData.unitCost),
       baseUnitCost: parseFloat(formData.baseUnitCost),
-      purchaseDate: new Date(formData.purchaseDate),
-      lastPurchaseCost: parseFloat(formData.cost) // Atualiza o último custo
+      purchaseDate: purchaseDate,
+      lastPurchaseCost: parseFloat(formData.cost)
     }
 
     onSave(productData)
   }
+
 
   // Calcula o custo unitário automaticamente
   useEffect(() => {

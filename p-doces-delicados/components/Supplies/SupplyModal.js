@@ -10,16 +10,24 @@ export default function SupplyModal({ isOpen, onClose, onSave, supply }) {
     name: '',
     cost: '',
     description: '',
-    purchaseDate: new Date().toISOString().split('T')[0] // NOVO CAMPO
+    purchaseDate: new Date().toISOString().split('T')[0]
   })
 
   useEffect(() => {
     if (supply) {
+      // CORREÇÃO: Converter a data do MongoDB para o fuso horário local
+      let purchaseDate = new Date().toISOString().split('T')[0]
+      if (supply.purchaseDate) {
+        const date = new Date(supply.purchaseDate)
+        // Ajusta para o fuso horário local
+        purchaseDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+      }
+
       setFormData({
         name: supply.name || '',
         cost: supply.cost || '',
         description: supply.description || '',
-        purchaseDate: supply.purchaseDate ? new Date(supply.purchaseDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        purchaseDate: purchaseDate
       })
     } else {
       setFormData({
@@ -39,10 +47,13 @@ export default function SupplyModal({ isOpen, onClose, onSave, supply }) {
       return
     }
 
+    // CORREÇÃO: Criar a data no fuso horário UTC para evitar problemas
+    const purchaseDate = new Date(formData.purchaseDate + 'T12:00:00Z') // Meio-dia UTC
+
     const supplyData = {
       ...formData,
       cost: parseFloat(formData.cost),
-      purchaseDate: new Date(formData.purchaseDate),
+      purchaseDate: purchaseDate,
       lastPurchaseCost: parseFloat(formData.cost)
     }
 
