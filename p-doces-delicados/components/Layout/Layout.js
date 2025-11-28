@@ -1,9 +1,10 @@
+// components/Layout/Layout.js (CORREÇÃO FINAL)
 import Header from './Header'
 import Sidebar from './Sidebar'
 import { useEffect, useState } from 'react'
 import ProtectedRoute from '../Auth/ProtectedRoute'
 import { useTheme } from '../../contexts/ThemeContext'
-import StatusBarFix from '../PWA/StatusBarFix' // Importe o componente
+import StatusBarFix from '../PWA/StatusBarFix'
 
 export default function Layout({ children, activePage }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -50,12 +51,33 @@ export default function Layout({ children, activePage }) {
     applyThemeAndColors()
   }, [theme])
 
+  // 🔥 NOVO: Prevenir scroll horizontal no mobile
+  useEffect(() => {
+    const preventHorizontalScroll = () => {
+      document.documentElement.style.overflowX = 'hidden'
+      document.body.style.overflowX = 'hidden'
+      document.documentElement.style.maxWidth = '100vw'
+      document.body.style.maxWidth = '100vw'
+    }
+
+    preventHorizontalScroll()
+    
+    // Reaplicar quando a orientação mudar
+    window.addEventListener('orientationchange', preventHorizontalScroll)
+    window.addEventListener('resize', preventHorizontalScroll)
+
+    return () => {
+      window.removeEventListener('orientationchange', preventHorizontalScroll)
+      window.removeEventListener('resize', preventHorizontalScroll)
+    }
+  }, [])
+
   return (
     <ProtectedRoute>
-      {/* 🔥 ADICIONE ESTE COMPONENTE NO TOPO */}
       <StatusBarFix />
       
-      <div className="min-h-screen flex">
+      {/* 🔥 CORREÇÃO: Container principal com controle rigoroso */}
+      <div className="min-h-screen flex w-full overflow-x-hidden relative">
         {/* Sidebar Mobile */}
         {sidebarOpen && (
           <div className="fixed inset-0 z-40 lg:hidden">
@@ -71,11 +93,12 @@ export default function Layout({ children, activePage }) {
           <Sidebar activePage={activePage} />
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        {/* 🔥 CORREÇÃO: Main Content com overflow rigoroso */}
+        <div className="flex-1 flex flex-col min-w-0">
           <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto">
+          <main className="flex-1 p-6 overflow-x-hidden">
+            {/* 🔥 CORREÇÃO: Container com largura máxima e overflow */}
+            <div className="max-w-full overflow-x-hidden">
               {children}
             </div>
           </main>
