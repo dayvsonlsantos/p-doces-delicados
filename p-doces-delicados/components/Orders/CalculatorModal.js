@@ -58,6 +58,11 @@ const calculateProfitMargin = (totalCost, salePrice) => {
   };
 };
 
+// Função de arredondamento para gramas
+const roundGrams = (grams) => {
+  return grams >= 0.5 ? Math.round(grams) : 0
+}
+
 export default function CalculatorModal({
   isOpen,
   onClose,
@@ -77,6 +82,7 @@ export default function CalculatorModal({
     items: true,
     masses: true,
     frostings: true,
+    extras: true,
     ingredients: true
   })
   const [dateFilter, setDateFilter] = useState('next10')
@@ -101,6 +107,7 @@ export default function CalculatorModal({
         items: true,
         masses: true,
         frostings: true,
+        extras: true,
         ingredients: true
       })
       setDateFilter('next10')
@@ -144,7 +151,7 @@ export default function CalculatorModal({
     const ingredientGrams = parseFloat(ingredient.grams)
 
     if (product.unit === 'un') {
-      const unitWeight = 50 // padrão 50g por unidade
+      const unitWeight = product.unitWeight || 50
       const units = ingredientGrams / unitWeight
       const cost = units * (product.unitCost || 0)
       return cost
@@ -188,6 +195,51 @@ export default function CalculatorModal({
       timeCost,
       totalCost: materialCost + timeCost
     }
+  }
+
+  // NOVA FUNÇÃO: Calcular extras e insumos
+  const calculateExtrasIngredients = (product, quantity, productType) => {
+    const extras = {}
+    
+    if (product.extras && product.extras.length > 0) {
+      product.extras.forEach(extra => {
+        const extraProduct = products.find(p => p._id === extra.productId)
+        if (extraProduct) {
+          let totalGrams = extra.grams * quantity
+          
+          if (extraProduct.unit === 'un') {
+            const unitWeight = extraProduct.unitWeight || 50
+            const units = Math.ceil(totalGrams / unitWeight)
+            if (units > 0) {
+              extras[extraProduct.name] = {
+                quantity: units,
+                unit: 'un',
+                product: extraProduct,
+                productName: product.name,
+                quantityPerUnit: extra.grams,
+                totalGrams: totalGrams
+              }
+            }
+          } else {
+            totalGrams = roundGrams(totalGrams)
+            if (totalGrams >= 0.5) {
+              const displayUnit = getDisplayUnit(extraProduct.unit)
+              const convertedValue = convertUnit(totalGrams, 'g', displayUnit)
+              extras[extraProduct.name] = {
+                quantity: convertedValue,
+                unit: displayUnit,
+                product: extraProduct,
+                productName: product.name,
+                quantityPerUnit: extra.grams,
+                totalGrams: totalGrams
+              }
+            }
+          }
+        }
+      })
+    }
+
+    return extras
   }
 
   // Limpar seleção quando mudar o tipo
@@ -541,7 +593,7 @@ export default function CalculatorModal({
   }
 
   // Função para calcular ingredientes consolidados
-  const calculateConsolidatedIngredients = (massGroups, frostingGroups = {}) => {
+  const calculateConsolidatedIngredients = (massGroups, frostingGroups = {}, extrasGroups = {}) => {
     const allIngredients = {}
 
     // Processar ingredientes das massas
@@ -568,6 +620,40 @@ export default function CalculatorModal({
           allIngredients[productName].grams += data.grams
         }
       })
+    })
+
+    // Processar ingredientes dos extras
+    Object.values(extrasGroups).forEach(extraData => {
+      const product = extraData.product
+      if (product) {
+        const totalGrams = extraData.totalGrams || 0
+        let quantity = 0
+        let unit = ''
+
+        if (product.unit === 'un') {
+          const unitWeight = product.unitWeight || 50
+          quantity = Math.ceil(totalGrams / unitWeight)
+          unit = 'un'
+        } else {
+          const displayUnit = getDisplayUnit(product.unit)
+          quantity = convertUnit(totalGrams, 'g', displayUnit)
+          unit = displayUnit
+        }
+
+        if (quantity > 0) {
+          if (!allIngredients[product.name]) {
+            allIngredients[product.name] = {
+              quantity: quantity,
+              unit: unit,
+              product: product,
+              grams: totalGrams
+            }
+          } else {
+            allIngredients[product.name].quantity += quantity
+            allIngredients[product.name].grams += totalGrams
+          }
+        }
+      }
     })
 
     return allIngredients
@@ -598,6 +684,7 @@ export default function CalculatorModal({
       // Cálculo para docinhos - CORRIGIDO
       const candyDetails = []
       const massGroups = {}
+      const extrasGroups = {}
       let totalMaterialCost = 0
       let totalTimeCost = 0
       let totalCost = 0
@@ -662,15 +749,40 @@ export default function CalculatorModal({
               }
             }
           })
+
+          // Processar extras e insumos dos docinhos
+          const candyExtras = calculateExtrasIngredients(product, quantity, 'docinhos')
+          Object.entries(candyExtras).forEach(([productName, extraData]) => {
+            if (!extrasGroups[productName]) {
+              extrasGroups[productName] = {
+                product: extraData.product,
+                totalQuantity: extraData.quantity,
+                totalGrams: extraData.totalGrams,
+                unit: extraData.unit,
+                candies: []
+              }
+            } else {
+              extrasGroups[productName].totalQuantity += extraData.quantity
+              extrasGroups[productName].totalGrams += extraData.totalGrams
+            }
+
+            extrasGroups[productName].candies.push({
+              candy: product,
+              quantity: quantity,
+              quantityPerCandy: extraData.quantityPerUnit,
+              totalQuantity: extraData.quantity
+            })
+          })
         }
       })
 
       // Calcular ingredientes consolidados para docinhos
-      const consolidatedIngredients = calculateConsolidatedIngredients(massGroups)
+      const consolidatedIngredients = calculateConsolidatedIngredients(massGroups, {}, extrasGroups)
 
       setCalculations({
         candyDetails: candyDetails || [],
         massGroups,
+        extrasGroups,
         consolidatedIngredients,
         totalMaterialCost: totalMaterialCost.toFixed(2),
         totalTimeCost: totalTimeCost.toFixed(2),
@@ -685,6 +797,7 @@ export default function CalculatorModal({
       const cakeDetails = []
       const massGroups = {}
       const frostingGroups = {}
+      const extrasGroups = {}
       let totalMaterialCost = 0
       let totalTimeCost = 0
       let totalCost = 0
@@ -787,16 +900,41 @@ export default function CalculatorModal({
               }
             })
           }
+
+          // Processar extras e insumos dos bolos
+          const cakeExtras = calculateExtrasIngredients(product, quantity, 'bolos')
+          Object.entries(cakeExtras).forEach(([productName, extraData]) => {
+            if (!extrasGroups[productName]) {
+              extrasGroups[productName] = {
+                product: extraData.product,
+                totalQuantity: extraData.quantity,
+                totalGrams: extraData.totalGrams,
+                unit: extraData.unit,
+                cakes: []
+              }
+            } else {
+              extrasGroups[productName].totalQuantity += extraData.quantity
+              extrasGroups[productName].totalGrams += extraData.totalGrams
+            }
+
+            extrasGroups[productName].cakes.push({
+              cake: product,
+              quantity: quantity,
+              quantityPerCake: extraData.quantityPerUnit,
+              totalQuantity: extraData.quantity
+            })
+          })
         }
       })
 
       // Calcular ingredientes consolidados para bolos
-      const consolidatedIngredients = calculateConsolidatedIngredients(massGroups, frostingGroups)
+      const consolidatedIngredients = calculateConsolidatedIngredients(massGroups, frostingGroups, extrasGroups)
 
       console.log('📊 Resultado bolos:', {
         cakeDetails,
         massGroups,
         frostingGroups,
+        extrasGroups,
         totalMaterialCost,
         totalTimeCost,
         totalCost,
@@ -808,6 +946,7 @@ export default function CalculatorModal({
         cakeDetails: cakeDetails || [],
         massGroups,
         frostingGroups,
+        extrasGroups,
         consolidatedIngredients,
         totalMaterialCost: totalMaterialCost.toFixed(2),
         totalTimeCost: totalTimeCost.toFixed(2),
@@ -929,6 +1068,7 @@ export default function CalculatorModal({
         items: true,
         masses: true,
         frostings: true,
+        extras: true,
         ingredients: true
       })
 
@@ -1179,6 +1319,46 @@ export default function CalculatorModal({
             </div>
           )}
 
+          {/* Extras e Insumos */}
+          {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
+                Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+              </h4>
+              <div className="space-y-3">
+                {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
+                  <div key={productName} className="p-3 rounded-lg bg-white/5">
+                    <div className="flex justify-between items-start mb-2">
+                      <h5 className="font-bold text-white text-sm">{productName}</h5>
+                      <span className="text-green-300 font-semibold text-sm">
+                        {extraData.unit === 'un' 
+                          ? `${extraData.totalQuantity} ${extraData.unit}`
+                          : `${extraData.totalQuantity}${extraData.unit}`
+                        }
+                      </span>
+                    </div>
+                    
+                    <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
+                    <div className="space-y-1">
+                      {extraData.cakes.map((cakeItem, idx) => (
+                        <div key={idx} className="flex justify-between text-xs text-white/60">
+                          <span>{cakeItem.cake.name}</span>
+                          <span>
+                            {cakeItem.quantity} un • 
+                            {extraData.unit === 'un' 
+                              ? ` ${cakeItem.totalQuantity} ${extraData.unit}`
+                              : ` ${cakeItem.totalQuantity}${extraData.unit}`
+                            }
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Ingredientes Consolidados */}
           {calculations.consolidatedIngredients && Object.keys(calculations.consolidatedIngredients).length > 0 && (
             <div>
@@ -1291,6 +1471,46 @@ export default function CalculatorModal({
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Extras e Insumos para Docinhos */}
+          {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
+                Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+              </h4>
+              <div className="space-y-3">
+                {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
+                  <div key={productName} className="p-3 rounded-lg bg-white/5">
+                    <div className="flex justify-between items-start mb-2">
+                      <h5 className="font-bold text-white text-sm">{productName}</h5>
+                      <span className="text-green-300 font-semibold text-sm">
+                        {extraData.unit === 'un' 
+                          ? `${extraData.totalQuantity} ${extraData.unit}`
+                          : `${extraData.totalQuantity}${extraData.unit}`
+                        }
+                      </span>
+                    </div>
+                    
+                    <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
+                    <div className="space-y-1">
+                      {extraData.candies.map((candyItem, idx) => (
+                        <div key={idx} className="flex justify-between text-xs text-white/60">
+                          <span>{candyItem.candy.name}</span>
+                          <span>
+                            {candyItem.quantity} un • 
+                            {extraData.unit === 'un' 
+                              ? ` ${candyItem.totalQuantity} ${extraData.unit}`
+                              : ` ${candyItem.totalQuantity}${extraData.unit}`
+                            }
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1598,6 +1818,11 @@ export default function CalculatorModal({
                                           {item.product.totalWeight}g por bolo
                                         </div>
                                       )}
+                                      {item.product?.extras && item.product.extras.length > 0 && (
+                                        <div className="text-blue-400 text-xs">
+                                          {item.product.extras.length} extra(s)
+                                        </div>
+                                      )}
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -1616,11 +1841,23 @@ export default function CalculatorModal({
                   </div>
                 </div>
               )}
+
+              {/* Mensagem quando não há encomendas */}
+              {filteredOrders.length === 0 && (
+                <div className="text-center py-8 bg-white/5 rounded-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500 mx-auto mb-4">
+                    <FaSearch size={24} />
+                  </div>
+                  <p className="text-white/60">Nenhuma encomenda encontrada</p>
+                  <p className="text-white/40 text-sm mt-1">
+                    Verifique os filtros selecionados ou o tipo de produção
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             /* RESULTADOS DO CÁLCULO - Interface interativa */
             <>
-              {/* Interface normal com expansão */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-white">
@@ -1718,16 +1955,16 @@ export default function CalculatorModal({
                                 <div className="flex-1">
                                   <span className="text-white font-medium text-sm">{item.cake.name}</span>
                                   <div className="text-white/60 text-xs">
-                                    {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un • {item.orderNumber}
+                                    {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • {item.orderNumber}
                                   </div>
                                   <div className="text-xs space-y-1 mt-1">
                                     <div className="flex justify-between">
                                       <span className="text-orange-400">Materiais:</span>
-                                      <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                                      <span className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-purple-400">Tempo:</span>
-                                      <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
+                                      <span className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</span>
                                     </div>
                                   </div>
                                   <div className="text-xs text-purple-400 mt-1">
@@ -1736,10 +1973,10 @@ export default function CalculatorModal({
                                 </div>
                                 <div className="text-right">
                                   <div className="text-green-400 font-semibold text-sm">
-                                    R$ {item.revenue.toFixed(2)}
+                                    R$ {(item.revenue || 0).toFixed(2)}
                                   </div>
                                   <div className="text-green-300 text-xs">
-                                    Lucro: R$ {item.profit.toFixed(2)}
+                                    Lucro: R$ {(item.profit || 0).toFixed(2)}
                                   </div>
                                 </div>
                               </div>
@@ -1867,6 +2104,58 @@ export default function CalculatorModal({
                       </div>
                     )}
 
+                    {/* Extras e Insumos */}
+                    {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
+                      <div className="border border-white/10 rounded-xl overflow-hidden">
+                        <div
+                          className="p-3 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                          onClick={() => toggleResultsSection('extras')}
+                        >
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-white font-semibold text-sm flex items-center gap-2">
+                              <FaBox className="w-4 h-4" />
+                              Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+                            </h4>
+                            {expandedResults.extras ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+                          </div>
+                        </div>
+
+                        {expandedResults.extras && (
+                          <div className="p-3 bg-white/3 space-y-3 max-h-40 overflow-y-auto">
+                            {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
+                              <div key={productName} className="p-3 rounded-lg bg-white/5">
+                                <div className="flex justify-between items-start mb-2">
+                                  <h5 className="font-bold text-white text-sm">{productName}</h5>
+                                  <span className="text-green-300 font-semibold text-sm">
+                                    {extraData.unit === 'un' 
+                                      ? `${extraData.totalQuantity} ${extraData.unit}`
+                                      : `${extraData.totalQuantity}${extraData.unit}`
+                                    }
+                                  </span>
+                                </div>
+                                
+                                <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
+                                <div className="space-y-1">
+                                  {extraData.cakes.map((cakeItem, idx) => (
+                                    <div key={idx} className="flex justify-between text-xs text-white/60">
+                                      <span>{cakeItem.cake.name}</span>
+                                      <span>
+                                        {cakeItem.quantity} un • 
+                                        {extraData.unit === 'un' 
+                                          ? ` ${cakeItem.totalQuantity} ${extraData.unit}`
+                                          : ` ${cakeItem.totalQuantity}${extraData.unit}`
+                                        }
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Ingredientes Consolidados */}
                     {calculations.consolidatedIngredients && Object.keys(calculations.consolidatedIngredients).length > 0 && (
                       <div className="border border-white/10 rounded-xl overflow-hidden">
@@ -1934,11 +2223,11 @@ export default function CalculatorModal({
                                   <div className="text-xs space-y-1 mt-1">
                                     <div className="flex justify-between">
                                       <span className="text-orange-400">Materiais:</span>
-                                      <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                                      <span className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-purple-400">Tempo:</span>
-                                      <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
+                                      <span className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</span>
                                     </div>
                                   </div>
                                   <div className="text-xs text-purple-400 mt-1">
@@ -1947,10 +2236,10 @@ export default function CalculatorModal({
                                 </div>
                                 <div className="text-right">
                                   <div className="text-green-400 font-semibold text-sm">
-                                    R$ {item.totalRevenue.toFixed(2)}
+                                    R$ {(item.totalRevenue || 0).toFixed(2)}
                                   </div>
                                   <div className="text-green-300 text-xs">
-                                    Lucro: R$ {item.totalProfit.toFixed(2)}
+                                    Lucro: R$ {(item.totalProfit || 0).toFixed(2)}
                                   </div>
                                 </div>
                               </div>
@@ -2014,6 +2303,58 @@ export default function CalculatorModal({
                                 </div>
                               )
                             })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Extras e Insumos para Docinhos */}
+                    {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
+                      <div className="border border-white/10 rounded-xl overflow-hidden">
+                        <div
+                          className="p-3 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                          onClick={() => toggleResultsSection('extras')}
+                        >
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-white font-semibold text-sm flex items-center gap-2">
+                              <FaBox className="w-4 h-4" />
+                              Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+                            </h4>
+                            {expandedResults.extras ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+                          </div>
+                        </div>
+
+                        {expandedResults.extras && (
+                          <div className="p-3 bg-white/3 space-y-3 max-h-40 overflow-y-auto">
+                            {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
+                              <div key={productName} className="p-3 rounded-lg bg-white/5">
+                                <div className="flex justify-between items-start mb-2">
+                                  <h5 className="font-bold text-white text-sm">{productName}</h5>
+                                  <span className="text-green-300 font-semibold text-sm">
+                                    {extraData.unit === 'un' 
+                                      ? `${extraData.totalQuantity} ${extraData.unit}`
+                                      : `${extraData.totalQuantity}${extraData.unit}`
+                                    }
+                                  </span>
+                                </div>
+                                
+                                <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
+                                <div className="space-y-1">
+                                  {extraData.candies.map((candyItem, idx) => (
+                                    <div key={idx} className="flex justify-between text-xs text-white/60">
+                                      <span>{candyItem.candy.name}</span>
+                                      <span>
+                                        {candyItem.quantity} un • 
+                                        {extraData.unit === 'un' 
+                                          ? ` ${candyItem.totalQuantity} ${extraData.unit}`
+                                          : ` ${candyItem.totalQuantity}${extraData.unit}`
+                                        }
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
