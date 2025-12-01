@@ -1,9 +1,9 @@
-// pages/batch.js - COMPLETO COM CUSTO FIXO E EXTRAS
+// pages/batch.js - COMPLETO COM CUSTO FIXO E EXTRAS (VERSÃO MELHORADA)
 import Layout from '../../../components/Layout/Layout'
 import GlassCard from '../../../components/UI/GlassCard'
 import GlassButton from '../../../components/UI/GlassButton'
 import { useState, useEffect, useRef } from 'react'
-import { FaCalculator, FaPlus, FaMinus, FaChevronDown, FaChevronUp, FaDownload, FaClock } from 'react-icons/fa'
+import { FaCalculator, FaPlus, FaMinus, FaChevronDown, FaChevronUp, FaDownload, FaClock, FaBox, FaList } from 'react-icons/fa'
 import html2canvas from 'html2canvas'
 
 // Funções de conversão de unidades
@@ -73,10 +73,10 @@ export default function BatchCalculator() {
   const [calculations, setCalculations] = useState(null)
   const [loading, setLoading] = useState(true)
   const [expandedSections, setExpandedSections] = useState({
-    candies: false,
-    masses: false,
-    extras: false,
-    summary: false
+    candies: true,
+    masses: true,
+    extras: true,
+    summary: true
   })
   const [fixedCosts, setFixedCosts] = useState([])
   const [totalCostPerMinute, setTotalCostPerMinute] = useState(0)
@@ -156,14 +156,16 @@ export default function BatchCalculator() {
 
   // Função para calcular ingredientes totais de uma massa
   const calculateMassIngredients = (mass, totalGrams) => {
+    if (!mass || !mass.ingredients) return {}
+
     const scaleFactor = totalGrams / mass.totalGrams
     const ingredients = {}
 
-    mass.ingredients?.forEach(ingredient => {
+    mass.ingredients.forEach(ingredient => {
       const product = products.find(p => p._id === ingredient.productId)
       if (product) {
-        let scaledGrams = ingredient.grams * scaleFactor
-        
+        const scaledGrams = ingredient.grams * scaleFactor
+
         if (product.unit === 'un') {
           const unitWeight = product.unitWeight || 50
           const units = Math.ceil(scaledGrams / unitWeight)
@@ -171,18 +173,19 @@ export default function BatchCalculator() {
             ingredients[product.name] = {
               quantity: units,
               unit: 'un',
-              product: product
+              product: product,
+              grams: scaledGrams
             }
           }
         } else {
-          scaledGrams = roundGrams(scaledGrams)
-          if (scaledGrams >= 0.5) {
-            const displayUnit = getDisplayUnit(product.unit)
-            const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
+          const displayUnit = getDisplayUnit(product.unit)
+          const convertedValue = convertUnit(scaledGrams, 'g', displayUnit)
+          if (convertedValue >= 0.5) {
             ingredients[product.name] = {
-              quantity: convertedValue,
+              quantity: Math.round(convertedValue * 100) / 100,
               unit: displayUnit,
-              product: product
+              product: product,
+              grams: scaledGrams
             }
           }
         }
@@ -211,7 +214,8 @@ export default function BatchCalculator() {
                 unit: 'un',
                 product: product,
                 candy: candy.name,
-                quantityPerCandy: extra.grams
+                quantityPerCandy: extra.grams,
+                totalGrams: totalGrams
               }
             }
           } else {
@@ -224,7 +228,8 @@ export default function BatchCalculator() {
                 unit: displayUnit,
                 product: product,
                 candy: candy.name,
-                quantityPerCandy: extra.grams
+                quantityPerCandy: extra.grams,
+                totalGrams: totalGrams
               }
             }
           }
@@ -233,6 +238,60 @@ export default function BatchCalculator() {
     }
 
     return extras
+  }
+
+  // Função para calcular ingredientes consolidados
+  const calculateConsolidatedIngredients = (massGroups, extrasGroups = {}) => {
+    const allIngredients = {}
+
+    // Processar ingredientes das massas
+    Object.values(massGroups).forEach(massData => {
+      const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
+      Object.entries(ingredients).forEach(([productName, data]) => {
+        if (!allIngredients[productName]) {
+          allIngredients[productName] = { ...data }
+        } else {
+          allIngredients[productName].quantity += data.quantity
+          allIngredients[productName].grams += data.grams
+        }
+      })
+    })
+
+    // Processar ingredientes dos extras
+    Object.values(extrasGroups).forEach(extraData => {
+      const product = extraData.product
+      if (product) {
+        const totalGrams = extraData.totalGrams || 0
+        let quantity = 0
+        let unit = ''
+
+        if (product.unit === 'un') {
+          const unitWeight = product.unitWeight || 50
+          quantity = Math.ceil(totalGrams / unitWeight)
+          unit = 'un'
+        } else {
+          const displayUnit = getDisplayUnit(product.unit)
+          quantity = convertUnit(totalGrams, 'g', displayUnit)
+          unit = displayUnit
+        }
+
+        if (quantity > 0) {
+          if (!allIngredients[product.name]) {
+            allIngredients[product.name] = {
+              quantity: quantity,
+              unit: unit,
+              product: product,
+              grams: totalGrams
+            }
+          } else {
+            allIngredients[product.name].quantity += quantity
+            allIngredients[product.name].grams += totalGrams
+          }
+        }
+      }
+    })
+
+    return allIngredients
   }
 
   const calculateBatch = () => {
@@ -274,8 +333,11 @@ export default function BatchCalculator() {
           totalRevenue += candyRevenue
           totalProfit += candyProfit
 
-          // Processar massas
-          const candyMasses = candy.masses || [{ massName: candy.massName, grams: candy.candyGrams }]
+          // Processar massas - CORRIGIDO para lidar com múltiplas massas
+          const candyMasses = candy.masses || []
+          if (candyMasses.length === 0 && candy.massName && candy.candyGrams) {
+            candyMasses.push({ massName: candy.massName, grams: candy.candyGrams })
+          }
 
           candyMasses.forEach(massItem => {
             if (massItem.massName && massItem.grams) {
@@ -289,14 +351,13 @@ export default function BatchCalculator() {
                   }
                 }
 
-                let massGrams = massItem.grams * quantity
-                massGrams = roundGrams(massGrams)
-                
+                const massGrams = massItem.grams * quantity
                 massGroups[massItem.massName].totalGrams += massGrams
                 massGroups[massItem.massName].candies.push({
                   candy: candy,
                   quantity: quantity,
-                  grams: massGrams
+                  grams: massGrams,
+                  gramsPerUnit: massItem.grams
                 })
               }
             }
@@ -308,13 +369,16 @@ export default function BatchCalculator() {
             if (!extrasGroups[productName]) {
               extrasGroups[productName] = {
                 product: extraData.product,
-                totalQuantity: 0,
+                totalQuantity: extraData.quantity,
+                totalGrams: extraData.totalGrams,
                 unit: extraData.unit,
                 candies: []
               }
+            } else {
+              extrasGroups[productName].totalQuantity += extraData.quantity
+              extrasGroups[productName].totalGrams += extraData.totalGrams
             }
 
-            extrasGroups[productName].totalQuantity += extraData.quantity
             extrasGroups[productName].candies.push({
               candy: candy,
               quantity: quantity,
@@ -326,10 +390,14 @@ export default function BatchCalculator() {
       }
     })
 
+    // Calcular ingredientes consolidados
+    const consolidatedIngredients = calculateConsolidatedIngredients(massGroups, extrasGroups)
+
     setCalculations({
       candyDetails,
       massGroups,
       extrasGroups,
+      consolidatedIngredients,
       totalMaterialCost: totalMaterialCost.toFixed(2),
       totalTimeCost: totalTimeCost.toFixed(2),
       totalCost: totalCost.toFixed(2),
@@ -342,30 +410,17 @@ export default function BatchCalculator() {
     if (!resultsRef.current) return
 
     try {
-      const originalExpandedState = { ...expandedSections }
-      
-      setExpandedSections({
-        candies: true,
-        masses: true,
-        extras: true,
-        summary: true
-      })
-
-      await new Promise(resolve => setTimeout(resolve, 100))
-
       const canvas = await html2canvas(resultsRef.current, {
-        backgroundColor: '#1a1b26',
+        backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         allowTaint: true
       })
 
       const link = document.createElement('a')
-      link.download = `calculo-docinhos-${new Date().toISOString().split('T')[0]}.png`
+      link.download = `calculo-lote-${new Date().toISOString().split('T')[0]}.png`
       link.href = canvas.toDataURL('image/png')
       link.click()
-
-      setExpandedSections(originalExpandedState)
 
     } catch (error) {
       console.error('Erro ao salvar PNG:', error)
@@ -373,96 +428,80 @@ export default function BatchCalculator() {
     }
   }
 
-  // Componente para renderizar os resultados expandidos (sempre aberto no PNG)
+  // Componente para renderizar os resultados no PNG (tema claro e completo)
   const ResultsForPNG = () => (
-    <div className="space-y-4 bg-gray-900 p-4 rounded-xl">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-white">Resultados do Lote de Docinhos</h3>
-        <div className="text-blue-400 text-sm">
-          Gerado em: {new Date().toLocaleDateString('pt-BR')}
-        </div>
+    <div className="space-y-6 p-6 bg-white text-gray-800" style={{ minWidth: '800px', fontFamily: 'Arial, sans-serif' }}>
+      {/* Cabeçalho */}
+      <div className="text-center border-b-2 border-blue-500 pb-4 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Cálculo de Lote de Docinhos</h1>
+        <p className="text-gray-600">
+          Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        </p>
       </div>
 
       {/* Resumo Financeiro */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      <div className="grid grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <div className="text-center">
-          <p className="text-orange-300 text-xs font-semibold">Custo Materiais</p>
-          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalMaterialCost}</p>
+          <p className="text-sm font-semibold text-blue-700">Custo Total</p>
+          <p className="text-xl font-bold text-blue-900">R$ {calculations.totalCost}</p>
         </div>
         <div className="text-center">
-          <p className="text-purple-300 text-xs font-semibold">Custo Tempo</p>
-          <p className="text-purple-400 text-lg font-bold">R$ {calculations.totalTimeCost}</p>
+          <p className="text-sm font-semibold text-green-700">Receita Total</p>
+          <p className="text-xl font-bold text-green-900">R$ {calculations.totalRevenue}</p>
         </div>
         <div className="text-center">
-          <p className="text-red-300 text-xs font-semibold">Custo Total</p>
-          <p className="text-red-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+          <p className="text-sm font-semibold text-emerald-700">Lucro Total</p>
+          <p className="text-xl font-bold text-emerald-900">R$ {calculations.totalProfit}</p>
         </div>
         <div className="text-center">
-          <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
-          <p className="text-blue-400 text-lg font-bold">R$ {calculations.totalRevenue}</p>
+          <p className="text-sm font-semibold text-purple-700">Margem</p>
+          <p className="text-xl font-bold text-purple-900">
+            {calculations.totalRevenue > 0
+              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+              : '0'}%
+          </p>
         </div>
-        <div className="text-center">
-          <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
-          <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
-        </div>
-      </div>
-
-      {/* Margem de Lucro */}
-      <div className="text-center p-3 bg-purple-500/10 rounded-xl">
-        <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
-        <p className="text-purple-400 text-xl font-bold">
-          {calculations.totalRevenue > 0 
-            ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-            : '0'
-          }%
-        </p>
-        <p className="text-purple-300 text-xs">
-          Custo: {calculations.totalRevenue > 0 
-            ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-            : '0'
-          }%
-        </p>
       </div>
 
       {/* Docinhos do Lote */}
-      <div>
-        <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-          Docinhos do Lote ({calculations.candyDetails.length})
-        </h4>
-        <div className="space-y-2">
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-purple-50 p-4 border-b border-purple-200">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <FaList className="w-4 h-4" />
+            Docinhos do Lote ({calculations.candyDetails.length})
+          </h2>
+        </div>
+        <div className="p-4 space-y-4">
           {calculations.candyDetails.map((item, idx) => {
             const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
             
             return (
-              <div key={idx} className="p-3 rounded-lg bg-white/5">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <span className="text-white font-medium text-sm">{item.candy.name}</span>
-                    <div className="text-white/60 text-xs">
-                      {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un
-                    </div>
+              <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">{item.candy.name}</h3>
+                    <p className="text-gray-600 text-sm">
+                      {item.quantity} unidades • Custo: R$ {(item.totalCost / item.quantity).toFixed(2)}/un
+                    </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-green-400 font-semibold text-sm">
-                      R$ {item.totalRevenue.toFixed(2)}
-                    </div>
-                    <div className="text-green-300 text-xs">
-                      Lucro: R$ {item.totalProfit.toFixed(2)}
-                    </div>
+                    <div className="text-green-700 font-bold text-lg">R$ {item.totalRevenue.toFixed(2)}</div>
+                    <div className="text-emerald-700 text-sm">Lucro: R$ {item.totalProfit.toFixed(2)}</div>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="text-center">
-                    <p className="text-orange-400">Materiais</p>
-                    <p className="text-orange-300">R$ {item.materialCost.toFixed(2)}</p>
+                
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="text-center p-2 bg-orange-50 rounded border border-orange-100">
+                    <p className="text-orange-700 font-semibold">Materiais</p>
+                    <p className="text-orange-900 font-bold">R$ {item.materialCost.toFixed(2)}</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-purple-400">Tempo</p>
-                    <p className="text-purple-300">R$ {item.timeCost.toFixed(2)}</p>
+                  <div className="text-center p-2 bg-purple-50 rounded border border-purple-100">
+                    <p className="text-purple-700 font-semibold">Tempo</p>
+                    <p className="text-purple-900 font-bold">R$ {item.timeCost.toFixed(2)}</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-blue-400">Margem</p>
-                    <p className="text-blue-300">{marginInfo.profitMargin}%</p>
+                  <div className="text-center p-2 bg-blue-50 rounded border border-blue-100">
+                    <p className="text-blue-700 font-semibold">Margem</p>
+                    <p className="text-blue-900 font-bold">{marginInfo.profitMargin}%</p>
                   </div>
                 </div>
               </div>
@@ -473,45 +512,65 @@ export default function BatchCalculator() {
 
       {/* Massas Agrupadas */}
       {Object.keys(calculations.massGroups).length > 0 && (
-        <div>
-          <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-            Massas Agrupadas ({Object.keys(calculations.massGroups).length})
-          </h4>
-          <div className="space-y-3">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-yellow-50 p-4 border-b border-yellow-200">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <FaBox className="w-4 h-4" />
+              Massas Utilizadas ({Object.keys(calculations.massGroups).length})
+            </h2>
+          </div>
+          <div className="p-4 space-y-6">
             {Object.entries(calculations.massGroups).map(([massName, massData]) => {
-              if (massData.totalGrams < 0.5) return null
-
               const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
               const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
               return (
-                <div key={massName} className="p-3 rounded-lg bg-white/5">
-                  <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
-                  <p className="text-white/60 text-xs mb-2">
-                    Total necessário: <strong>{roundGrams(massData.totalGrams)}g</strong>
-                  </p>
-                  
-                  <p className="text-white/60 text-xs mb-1">Docinhos que usam esta massa:</p>
-                  <div className="space-y-1 mb-3">
-                    {massData.candies.map((candyItem, idx) => (
-                      <div key={idx} className="flex justify-between text-xs text-white/60">
-                        <span>{candyItem.candy.name}</span>
-                        <span>
-                          {candyItem.quantity} un • {roundGrams(candyItem.grams)}g
-                        </span>
-                      </div>
-                    ))}
+                <div key={massName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900">{massName}</h3>
+                      <p className="text-gray-600 text-sm">
+                        Total necessário: <span className="font-bold text-blue-700">{(massData.totalGrams || 0).toFixed(0)}g</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Docinhos que usam esta massa:</p>
+                      <p className="font-medium text-gray-800">{massData.candies.length} tipo(s)</p>
+                    </div>
                   </div>
 
-                  {validIngredients.length > 0 ? (
+                  {/* Detalhes dos docinhos que usam esta massa */}
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-gray-800 mb-2 text-sm">📋 Docinhos específicos:</h4>
+                    <div className="space-y-2">
+                      {massData.candies.map((candyItem, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                          <div>
+                            <span className="font-medium text-gray-900">{candyItem.candy.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm">
+                              <span className="text-gray-600">{candyItem.quantity} unidades</span>
+                            </div>
+                            <div className="text-sm font-semibold text-blue-700">
+                              {candyItem.gramsPerUnit}g/un • Total: {candyItem.grams.toFixed(0)}g
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Ingredientes necessários para esta massa */}
+                  {validIngredients.length > 0 && (
                     <div>
-                      <p className="text-white/60 text-xs mb-1">Ingredientes necessários:</p>
-                      <div className="space-y-1">
+                      <h4 className="font-semibold text-gray-800 mb-2 text-sm">🧾 Ingredientes para esta massa:</h4>
+                      <div className="grid grid-cols-2 gap-2">
                         {validIngredients.map(([productName, data]) => (
-                          <div key={productName} className="flex justify-between text-xs">
-                            <span className="text-white">{productName}</span>
-                            <span className="text-green-300 font-semibold">
-                              {data.unit === 'un' 
+                          <div key={productName} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                            <span className="font-medium text-gray-900">{productName}</span>
+                            <span className="font-bold text-green-700">
+                              {data.unit === 'un'
                                 ? `${data.quantity} ${data.unit}`
                                 : `${data.quantity}${data.unit}`
                               }
@@ -520,30 +579,28 @@ export default function BatchCalculator() {
                         ))}
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-white/40 text-xs text-center py-1">
-                      Quantidades muito pequenas após arredondamento
-                    </p>
                   )}
                 </div>
               )
-            }).filter(Boolean)}
+            })}
           </div>
         </div>
       )}
 
       {/* Extras e Insumos */}
-      {Object.keys(calculations.extrasGroups).length > 0 && (
-        <div>
-          <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-            Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
-          </h4>
-          <div className="space-y-3">
+      {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-purple-50 p-4 border-b border-purple-200">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              🎁 Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+            </h2>
+          </div>
+          <div className="p-4 space-y-4">
             {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
-              <div key={productName} className="p-3 rounded-lg bg-white/5">
-                <div className="flex justify-between items-start mb-2">
-                  <h5 className="font-bold text-white text-sm">{productName}</h5>
-                  <span className="text-green-300 font-semibold text-sm">
+              <div key={productName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-gray-900">{productName}</h3>
+                  <span className="font-bold text-green-700 text-lg">
                     {extraData.unit === 'un' 
                       ? `${extraData.totalQuantity} ${extraData.unit}`
                       : `${extraData.totalQuantity}${extraData.unit}`
@@ -551,18 +608,20 @@ export default function BatchCalculator() {
                   </span>
                 </div>
                 
-                <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
-                <div className="space-y-1">
+                <h4 className="font-semibold text-gray-800 mb-2 text-sm">Utilizado nos docinhos:</h4>
+                <div className="space-y-2">
                   {extraData.candies.map((candyItem, idx) => (
-                    <div key={idx} className="flex justify-between text-xs text-white/60">
-                      <span>{candyItem.candy.name}</span>
-                      <span>
-                        {candyItem.quantity} un • 
-                        {extraData.unit === 'un' 
-                          ? ` ${candyItem.totalQuantity} ${extraData.unit}`
-                          : ` ${candyItem.totalQuantity}${extraData.unit}`
-                        }
-                      </span>
+                    <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                      <span className="font-medium text-gray-900">{candyItem.candy.name}</span>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">{candyItem.quantity} unidades</div>
+                        <div className="text-sm font-semibold text-blue-700">
+                          {extraData.unit === 'un' 
+                            ? `${candyItem.totalQuantity} ${extraData.unit}`
+                            : `${candyItem.totalQuantity}${extraData.unit}`
+                          }
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -572,11 +631,37 @@ export default function BatchCalculator() {
         </div>
       )}
 
-      {/* Informação sobre unidades e arredondamento */}
-      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-        <p className="text-blue-300 text-xs text-center">
-          💡 <strong>Unidades convertidas:</strong> Kg → g, L → ml, Unidades mantidas como "un"
-        </p>
+      {/* Ingredientes Consolidados */}
+      {calculations.consolidatedIngredients && Object.keys(calculations.consolidatedIngredients).length > 0 && (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-green-50 p-4 border-b border-green-200">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              📦 Ingredientes Consolidados ({Object.keys(calculations.consolidatedIngredients).length})
+            </h2>
+            <p className="text-gray-600 text-sm mt-1">Soma total de todos os ingredientes necessários</p>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(calculations.consolidatedIngredients).map(([productName, data]) => (
+                <div key={productName} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
+                  <span className="font-medium text-gray-900">{productName}</span>
+                  <span className="font-bold text-green-700">
+                    {data.unit === 'un'
+                      ? `${data.quantity} ${data.unit}`
+                      : `${data.quantity}${data.unit}`
+                    }
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rodapé */}
+      <div className="border-t border-gray-300 pt-4 mt-6 text-center text-gray-500 text-sm">
+        <p>💡 Sistema gerado automaticamente • Quantidades em gramas por unidade especificadas</p>
+        <p className="mt-1">Total de docinhos selecionados: {Object.values(selectedCandies).reduce((sum, qty) => sum + qty, 0)} unidades</p>
       </div>
     </div>
   )
@@ -764,7 +849,10 @@ export default function BatchCalculator() {
                 onClick={() => toggleSection('candies')}
               >
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20">
-                  <h3 className="font-bold text-primary">Docinhos do Lote</h3>
+                  <h3 className="font-bold text-primary flex items-center gap-2">
+                    <FaList className="w-4 h-4" />
+                    Docinhos do Lote ({calculations.candyDetails.length})
+                  </h3>
                   {expandedSections.candies ? <FaChevronUp /> : <FaChevronDown />}
                 </div>
               </div>
@@ -775,34 +863,35 @@ export default function BatchCalculator() {
                     const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
                     
                     return (
-                      <div key={idx} className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                        <div>
-                          <span className="text-primary font-semibold">{item.candy.name}</span>
-                          <div className="text-secondary text-xs">
-                            {item.quantity} un • R$ {item.totalCost.toFixed(2)} custo total
-                          </div>
-                          <div className="text-xs space-y-1 mt-1">
-                            <div className="flex justify-between">
-                              <span className="text-orange-400">Materiais:</span>
-                              <span className="text-orange-300">R$ {item.materialCost.toFixed(2)}</span>
+                      <div key={idx} className="p-3 rounded-xl bg-white/5">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <span className="text-primary font-semibold text-sm">{item.candy.name}</span>
+                            <div className="text-secondary text-xs">
+                              {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un
                             </div>
-                            {item.timeCost > 0 && (
-                              <div className="flex justify-between">
-                                <span className="text-purple-400">Tempo:</span>
-                                <span className="text-purple-300">R$ {item.timeCost.toFixed(2)}</span>
-                              </div>
-                            )}
                           </div>
-                          <div className="text-xs text-purple-400 mt-1">
-                            Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
+                          <div className="text-right">
+                            <div className="text-green-400 font-semibold text-sm">
+                              R$ {item.totalRevenue.toFixed(2)}
+                            </div>
+                            <div className="text-green-300 text-xs">
+                              Lucro: R$ {item.totalProfit.toFixed(2)}
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-green-400 font-semibold">
-                            R$ {item.totalRevenue.toFixed(2)}
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="text-center">
+                            <p className="text-orange-400">Materiais</p>
+                            <p className="text-orange-300">R$ {item.materialCost.toFixed(2)}</p>
                           </div>
-                          <div className="text-green-300 text-xs">
-                            Lucro: R$ {item.totalProfit.toFixed(2)}
+                          <div className="text-center">
+                            <p className="text-purple-400">Tempo</p>
+                            <p className="text-purple-300">R$ {item.timeCost.toFixed(2)}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-blue-400">Margem</p>
+                            <p className="text-blue-300">{marginInfo.profitMargin}%</p>
                           </div>
                         </div>
                       </div>
@@ -817,7 +906,10 @@ export default function BatchCalculator() {
                 onClick={() => toggleSection('masses')}
               >
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-green-500/10 border border-green-500/20">
-                  <h3 className="font-bold text-primary">Massas Agrupadas</h3>
+                  <h3 className="font-bold text-primary flex items-center gap-2">
+                    <FaBox className="w-4 h-4" />
+                    Massas Utilizadas ({Object.keys(calculations.massGroups).length})
+                  </h3>
                   {expandedSections.masses ? <FaChevronUp /> : <FaChevronDown />}
                 </div>
               </div>
@@ -825,28 +917,27 @@ export default function BatchCalculator() {
               {expandedSections.masses && (
                 <div className="space-y-4 p-4 bg-white/5 rounded-2xl">
                   {Object.entries(calculations.massGroups).map(([massName, massData]) => {
-                    if (massData.totalGrams < 0.5) {
-                      return null
-                    }
-
                     const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
                     const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
                     return (
                       <div key={massName} className="p-4 rounded-xl bg-white/5">
-                        <h4 className="font-bold text-primary mb-3">{massName}</h4>
+                        <div className="flex justify-between items-start mb-3">
+                          <h4 className="font-bold text-primary text-sm">{massName}</h4>
+                          <span className="text-yellow-300 font-bold text-sm">
+                            Total: {(massData.totalGrams || 0).toFixed(0)}g
+                          </span>
+                        </div>
 
+                        {/* Detalhes dos docinhos que usam esta massa */}
                         <div className="mb-3">
-                          <p className="text-secondary text-sm mb-2">
-                            Total necessário: <strong>{roundGrams(massData.totalGrams)}g</strong>
-                          </p>
-                          <p className="text-secondary text-xs">Docinhos que usam esta massa:</p>
-                          <div className="space-y-1 mt-1">
+                          <p className="text-secondary text-xs mb-1">Docinhos que usam esta massa:</p>
+                          <div className="space-y-1">
                             {massData.candies.map((candyItem, idx) => (
                               <div key={idx} className="flex justify-between text-xs text-white/60">
                                 <span>{candyItem.candy.name}</span>
-                                <span>
-                                  {candyItem.quantity} un • {roundGrams(candyItem.grams)}g
+                                <span className="text-yellow-300">
+                                  {candyItem.quantity} un • {candyItem.gramsPerUnit}g/un
                                 </span>
                               </div>
                             ))}
@@ -855,12 +946,12 @@ export default function BatchCalculator() {
 
                         {validIngredients.length > 0 ? (
                           <div>
-                            <p className="text-secondary text-sm mb-2">Ingredientes necessários:</p>
-                            <div className="space-y-2">
+                            <p className="text-secondary text-xs mb-1">Ingredientes necessários:</p>
+                            <div className="space-y-1">
                               {validIngredients.map(([productName, data]) => (
-                                <div key={productName} className="flex justify-between text-sm">
+                                <div key={productName} className="flex justify-between text-xs">
                                   <span className="text-white">{productName}</span>
-                                  <span className="text-primary-300 font-semibold">
+                                  <span className="text-green-300 font-semibold">
                                     {data.unit === 'un' 
                                       ? `${data.quantity} ${data.unit}`
                                       : `${data.quantity}${data.unit}`
@@ -871,13 +962,13 @@ export default function BatchCalculator() {
                             </div>
                           </div>
                         ) : (
-                          <p className="text-secondary text-sm text-center py-2">
+                          <p className="text-secondary text-xs text-center py-1">
                             Quantidades muito pequenas após arredondamento
                           </p>
                         )}
                       </div>
                     )
-                  }).filter(Boolean)}
+                  })}
                 </div>
               )}
 
@@ -887,7 +978,9 @@ export default function BatchCalculator() {
                 onClick={() => toggleSection('extras')}
               >
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
-                  <h3 className="font-bold text-primary">Extras e Insumos</h3>
+                  <h3 className="font-bold text-primary flex items-center gap-2">
+                    🎁 Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+                  </h3>
                   {expandedSections.extras ? <FaChevronUp /> : <FaChevronDown />}
                 </div>
               </div>
@@ -897,8 +990,8 @@ export default function BatchCalculator() {
                   {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
                     <div key={productName} className="p-4 rounded-xl bg-white/5">
                       <div className="flex justify-between items-start mb-3">
-                        <h4 className="font-bold text-primary">{productName}</h4>
-                        <span className="text-primary-300 font-semibold">
+                        <h4 className="font-bold text-primary text-sm">{productName}</h4>
+                        <span className="text-green-300 font-semibold text-sm">
                           {extraData.unit === 'un' 
                             ? `${extraData.totalQuantity} ${extraData.unit}`
                             : `${extraData.totalQuantity}${extraData.unit}`
@@ -908,11 +1001,11 @@ export default function BatchCalculator() {
 
                       <div className="mb-3">
                         <p className="text-secondary text-xs mb-2">Utilizado em:</p>
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           {extraData.candies.map((candyItem, idx) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                              <span className="text-white">{candyItem.candy.name}</span>
-                              <span className="text-white/60">
+                            <div key={idx} className="flex justify-between text-xs text-white/60">
+                              <span>{candyItem.candy.name}</span>
+                              <span>
                                 {candyItem.quantity} un • 
                                 {extraData.unit === 'un' 
                                   ? ` ${candyItem.totalQuantity} ${extraData.unit}`
@@ -926,6 +1019,41 @@ export default function BatchCalculator() {
                     </div>
                   ))}
                 </div>
+              )}
+
+              {/* Ingredientes Consolidados */}
+              {calculations.consolidatedIngredients && Object.keys(calculations.consolidatedIngredients).length > 0 && (
+                <>
+                  <div
+                    className="cursor-pointer"
+                    onClick={() => toggleSection('ingredients')}
+                  >
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-green-500/10 border border-green-500/20">
+                      <h3 className="font-bold text-primary flex items-center gap-2">
+                        📦 Ingredientes Consolidados ({Object.keys(calculations.consolidatedIngredients).length})
+                      </h3>
+                      {expandedSections.ingredients ? <FaChevronUp /> : <FaChevronDown />}
+                    </div>
+                  </div>
+
+                  {expandedSections.ingredients && (
+                    <div className="p-4 bg-white/5 rounded-2xl">
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(calculations.consolidatedIngredients).map(([productName, data]) => (
+                          <div key={productName} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                            <span className="text-white font-medium text-sm">{productName}</span>
+                            <span className="text-green-300 font-semibold text-sm">
+                              {data.unit === 'un'
+                                ? `${data.quantity} ${data.unit}`
+                                : `${data.quantity}${data.unit}`
+                              }
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (

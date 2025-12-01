@@ -744,6 +744,7 @@ export default function CalculatorModal({
                   candy: product,
                   quantity: quantity,
                   grams: massGrams,
+                  gramsPerUnit: massItem.grams,
                   orderNumber: selectedItem.orderNumber
                 })
               }
@@ -864,6 +865,7 @@ export default function CalculatorModal({
                   cake: product,
                   quantity: quantity,
                   grams: massGrams,
+                  gramsPerUnit: massItem.grams,
                   orderNumber: selectedItem.orderNumber
                 })
 
@@ -892,6 +894,7 @@ export default function CalculatorModal({
                     cake: product,
                     quantity: quantity,
                     grams: frostingGrams,
+                    gramsPerUnit: frostingItem.grams,
                     orderNumber: selectedItem.orderNumber
                   })
 
@@ -1062,20 +1065,8 @@ export default function CalculatorModal({
     if (!resultsRef.current) return
 
     try {
-      const originalExpandedState = { ...expandedResults }
-
-      setExpandedResults({
-        items: true,
-        masses: true,
-        frostings: true,
-        extras: true,
-        ingredients: true
-      })
-
-      await new Promise(resolve => setTimeout(resolve, 100))
-
       const canvas = await html2canvas(resultsRef.current, {
-        backgroundColor: '#1a1b26',
+        backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         allowTaint: true
@@ -1085,8 +1076,6 @@ export default function CalculatorModal({
       link.download = `calculo-producao-${new Date().toISOString().split('T')[0]}.png`
       link.href = canvas.toDataURL('image/png')
       link.click()
-
-      setExpandedResults(originalExpandedState)
 
     } catch (error) {
       console.error('Erro ao salvar PNG:', error)
@@ -1124,133 +1113,107 @@ export default function CalculatorModal({
     setSelectedItems(newSelection)
   }
 
-  // Componente para renderizar os resultados expandidos (sempre aberto no PNG)
+  // Componente para o PNG com tema claro e informações detalhadas
   const ResultsForPNG = () => (
-    <div className="space-y-4 bg-gray-900 p-4 rounded-xl">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-white">
-          Resultados do Cálculo - {selectedType === 'docinhos' ? 'Docinhos' : 'Bolos'}
-        </h3>
-        <div className="text-blue-400 text-sm">
-          Gerado em: {new Date().toLocaleDateString('pt-BR')}
-        </div>
+    <div className="space-y-6 p-6 bg-white text-gray-800" style={{ minWidth: '800px', fontFamily: 'Arial, sans-serif' }}>
+      {/* Cabeçalho */}
+      <div className="text-center border-b-2 border-blue-500 pb-4 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Cálculo de Produção - {selectedType === 'docinhos' ? 'Docinhos' : 'Bolos'}
+        </h1>
+        <p className="text-gray-600">
+          Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        </p>
       </div>
 
-      {/* Resumo Financeiro com Custo Materiais, Custo Tempo e Custo Total */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-blue-500/10 rounded-xl">
+      {/* Resumo Financeiro */}
+      <div className="grid grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <div className="text-center">
-          <p className="text-orange-300 text-xs font-semibold">Custo Materiais</p>
-          <p className="text-orange-400 text-lg font-bold">R$ {calculations.totalMaterialCost}</p>
+          <p className="text-sm font-semibold text-blue-700">Custo Total</p>
+          <p className="text-xl font-bold text-blue-900">R$ {calculations.totalCost}</p>
         </div>
         <div className="text-center">
-          <p className="text-purple-300 text-xs font-semibold">Custo Tempo</p>
-          <p className="text-purple-400 text-lg font-bold">R$ {calculations.totalTimeCost}</p>
+          <p className="text-sm font-semibold text-green-700">Receita Total</p>
+          <p className="text-xl font-bold text-green-900">R$ {calculations.totalRevenue}</p>
         </div>
         <div className="text-center">
-          <p className="text-red-300 text-xs font-semibold">Custo Total</p>
-          <p className="text-red-400 text-lg font-bold">R$ {calculations.totalCost}</p>
+          <p className="text-sm font-semibold text-emerald-700">Lucro Total</p>
+          <p className="text-xl font-bold text-emerald-900">R$ {calculations.totalProfit}</p>
         </div>
         <div className="text-center">
-          <p className="text-blue-300 text-xs font-semibold">Receita Total</p>
-          <p className="text-blue-400 text-lg font-bold">R$ {calculations.totalRevenue}</p>
+          <p className="text-sm font-semibold text-purple-700">Margem</p>
+          <p className="text-xl font-bold text-purple-900">
+            {calculations.totalRevenue > 0
+              ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
+              : '0'}%
+          </p>
         </div>
-        <div className="text-center">
-          <p className="text-green-300 text-xs font-semibold">Lucro Total</p>
-          <p className="text-green-400 text-lg font-bold">R$ {calculations.totalProfit}</p>
-        </div>
-      </div>
-
-      {/* Margem de Lucro */}
-      <div className="text-center p-3 bg-purple-500/10 rounded-xl">
-        <p className="text-purple-300 text-sm font-semibold">Margem de Lucro</p>
-        <p className="text-purple-400 text-xl font-bold">
-          {calculations.totalRevenue > 0
-            ? (100 - (parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-            : '0'
-          }%
-        </p>
-        <p className="text-purple-300 text-xs">
-          Custo: {calculations.totalRevenue > 0
-            ? ((parseFloat(calculations.totalCost) / parseFloat(calculations.totalRevenue) * 100)).toFixed(1)
-            : '0'
-          }%
-        </p>
       </div>
 
       {/* Conteúdo específico por tipo */}
-      {calculations.type === 'bolos' ? (
-        /* RESULTADOS PARA BOLOS - COMPLETO */
-        <>
-          {/* Bolos do Lote */}
-          <div>
-            <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-              Bolos do Lote ({calculations.cakeDetails?.length || 0})
-            </h4>
-            <div className="space-y-2">
-              {calculations.cakeDetails?.map((item, idx) => {
-                const marginInfo = calculateProfitMargin(item.totalCost || 0, item.revenue || 0);
-
-                return (
-                  <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                    <div className="flex-1">
-                      <span className="text-white font-medium text-sm">{item.cake.name}</span>
-                      <div className="text-white/60 text-xs">
-                        {item.quantity} un • R$ {(item.unitCost || 0).toFixed(2)}/un • {item.orderNumber}
-                      </div>
-                      <div className="text-xs space-y-1 mt-1">
-                        <div className="flex justify-between">
-                          <span className="text-orange-400">Materiais:</span>
-                          <span className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-purple-400">Tempo:</span>
-                          <span className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="text-xs text-purple-400 mt-1">
-                        Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-green-400 font-semibold text-sm">
-                        R$ {(item.revenue || 0).toFixed(2)}
-                      </div>
-                      <div className="text-green-300 text-xs">
-                        Lucro: R$ {(item.profit || 0).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Massas Agrupadas */}
+      {calculations.type === 'docinhos' ? (
+        /* RESULTADOS PARA DOCINHOS - DETALHADO */
+        <div className="space-y-6">
+          {/* Massas Utilizadas com Detalhes por Docinho */}
           {Object.keys(calculations.massGroups).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Massas Agrupadas ({Object.keys(calculations.massGroups).length})
-              </h4>
-              <div className="space-y-3">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-yellow-50 p-4 border-b border-yellow-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  🍬 Massas Utilizadas ({Object.keys(calculations.massGroups).length})
+                </h2>
+              </div>
+              <div className="p-4 space-y-6">
                 {Object.entries(calculations.massGroups).map(([massName, massData]) => {
                   const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
                   const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
                   return (
-                    <div key={massName} className="p-3 rounded-lg bg-white/5">
-                      <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
-                      <p className="text-white/60 text-xs mb-2">
-                        Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
-                      </p>
-
-                      {validIngredients.length > 0 ? (
+                    <div key={massName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-4">
                         <div>
-                          <p className="text-white/60 text-xs mb-1">Ingredientes necessários:</p>
-                          <div className="space-y-1">
+                          <h3 className="font-bold text-lg text-gray-900">{massName}</h3>
+                          <p className="text-gray-600 text-sm">
+                            Total necessário: <span className="font-bold text-blue-700">{(massData.totalGrams || 0).toFixed(0)}g</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Docinhos que usam esta massa:</p>
+                          <p className="font-medium text-gray-800">{massData.candies.length} tipo(s)</p>
+                        </div>
+                      </div>
+
+                      {/* Detalhes dos docinhos que usam esta massa */}
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-800 mb-2 text-sm">📋 Docinhos específicos:</h4>
+                        <div className="space-y-2">
+                          {massData.candies.map((candyItem, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                              <div>
+                                <span className="font-medium text-gray-900">{candyItem.candy.name}</span>
+                                <span className="text-gray-500 text-xs ml-2">({candyItem.orderNumber})</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm">
+                                  <span className="text-gray-600">{candyItem.quantity} unidades</span>
+                                </div>
+                                <div className="text-sm font-semibold text-blue-700">
+                                  {candyItem.gramsPerUnit}g/un • Total: {candyItem.grams.toFixed(0)}g
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Ingredientes necessários para esta massa */}
+                      {validIngredients.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-gray-800 mb-2 text-sm">🧾 Ingredientes para esta massa:</h4>
+                          <div className="grid grid-cols-2 gap-2">
                             {validIngredients.map(([productName, data]) => (
-                              <div key={productName} className="flex justify-between text-xs">
-                                <span className="text-white">{productName}</span>
-                                <span className="text-green-300 font-semibold">
+                              <div key={productName} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                                <span className="font-medium text-gray-900">{productName}</span>
+                                <span className="font-bold text-green-700">
                                   {data.unit === 'un'
                                     ? `${data.quantity} ${data.unit}`
                                     : `${data.quantity}${data.unit}`
@@ -1260,57 +1223,6 @@ export default function CalculatorModal({
                             ))}
                           </div>
                         </div>
-                      ) : (
-                        <p className="text-white/40 text-xs text-center py-1">
-                          Quantidades muito pequenas após arredondamento
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Coberturas Agrupadas */}
-          {calculations.frostingGroups && Object.keys(calculations.frostingGroups).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Coberturas Agrupadas ({Object.keys(calculations.frostingGroups).length})
-              </h4>
-              <div className="space-y-3">
-                {Object.entries(calculations.frostingGroups).map(([frostingName, frostingData]) => {
-                  const ingredients = calculateFrostingIngredients(frostingData.frosting, frostingData.totalGrams)
-                  const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
-
-                  return (
-                    <div key={frostingName} className="p-3 rounded-lg bg-white/5">
-                      <h5 className="font-bold text-white text-sm mb-2">{frostingName}</h5>
-                      <p className="text-white/60 text-xs mb-2">
-                        Total necessário: <strong>{(frostingData.totalGrams || 0).toFixed(2)}g</strong>
-                      </p>
-
-                      {validIngredients.length > 0 ? (
-                        <div>
-                          <p className="text-white/60 text-xs mb-1">Ingredientes necessários:</p>
-                          <div className="space-y-1">
-                            {validIngredients.map(([productName, data]) => (
-                              <div key={productName} className="flex justify-between text-xs">
-                                <span className="text-white">{productName}</span>
-                                <span className="text-green-300 font-semibold">
-                                  {data.unit === 'un'
-                                    ? `${data.quantity} ${data.unit}`
-                                    : `${data.quantity}${data.unit}`
-                                  }
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-white/40 text-xs text-center py-1">
-                          Quantidades muito pequenas após arredondamento
-                        </p>
                       )}
                     </div>
                   )
@@ -1321,16 +1233,18 @@ export default function CalculatorModal({
 
           {/* Extras e Insumos */}
           {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
-              </h4>
-              <div className="space-y-3">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-purple-50 p-4 border-b border-purple-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  🎁 Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+                </h2>
+              </div>
+              <div className="p-4 space-y-4">
                 {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
-                  <div key={productName} className="p-3 rounded-lg bg-white/5">
-                    <div className="flex justify-between items-start mb-2">
-                      <h5 className="font-bold text-white text-sm">{productName}</h5>
-                      <span className="text-green-300 font-semibold text-sm">
+                  <div key={productName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-gray-900">{productName}</h3>
+                      <span className="font-bold text-green-700 text-lg">
                         {extraData.unit === 'un' 
                           ? `${extraData.totalQuantity} ${extraData.unit}`
                           : `${extraData.totalQuantity}${extraData.unit}`
@@ -1338,18 +1252,20 @@ export default function CalculatorModal({
                       </span>
                     </div>
                     
-                    <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
-                    <div className="space-y-1">
-                      {extraData.cakes.map((cakeItem, idx) => (
-                        <div key={idx} className="flex justify-between text-xs text-white/60">
-                          <span>{cakeItem.cake.name}</span>
-                          <span>
-                            {cakeItem.quantity} un • 
-                            {extraData.unit === 'un' 
-                              ? ` ${cakeItem.totalQuantity} ${extraData.unit}`
-                              : ` ${cakeItem.totalQuantity}${extraData.unit}`
-                            }
-                          </span>
+                    <h4 className="font-semibold text-gray-800 mb-2 text-sm">Utilizado nos docinhos:</h4>
+                    <div className="space-y-2">
+                      {extraData.candies.map((candyItem, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                          <span className="font-medium text-gray-900">{candyItem.candy.name}</span>
+                          <div className="text-right">
+                            <div className="text-sm text-gray-600">{candyItem.quantity} unidades</div>
+                            <div className="text-sm font-semibold text-blue-700">
+                              {extraData.unit === 'un' 
+                                ? `${candyItem.totalQuantity} ${extraData.unit}`
+                                : `${candyItem.totalQuantity}${extraData.unit}`
+                              }
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1361,99 +1277,94 @@ export default function CalculatorModal({
 
           {/* Ingredientes Consolidados */}
           {calculations.consolidatedIngredients && Object.keys(calculations.consolidatedIngredients).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Ingredientes Consolidados ({Object.keys(calculations.consolidatedIngredients).length})
-              </h4>
-              <div className="space-y-2">
-                {Object.entries(calculations.consolidatedIngredients).map(([productName, data]) => (
-                  <div key={productName} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                    <span className="text-white font-medium text-sm">{productName}</span>
-                    <span className="text-green-300 font-semibold text-sm">
-                      {data.unit === 'un'
-                        ? `${data.quantity} ${data.unit}`
-                        : `${data.quantity}${data.unit}`
-                      }
-                    </span>
-                  </div>
-                ))}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-green-50 p-4 border-b border-green-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  📦 Ingredientes Consolidados ({Object.keys(calculations.consolidatedIngredients).length})
+                </h2>
+                <p className="text-gray-600 text-sm mt-1">Soma total de todos os ingredientes necessários</p>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(calculations.consolidatedIngredients).map(([productName, data]) => (
+                    <div key={productName} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
+                      <span className="font-medium text-gray-900">{productName}</span>
+                      <span className="font-bold text-green-700">
+                        {data.unit === 'un'
+                          ? `${data.quantity} ${data.unit}`
+                          : `${data.quantity}${data.unit}`
+                        }
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
-        </>
+        </div>
       ) : (
-        /* RESULTADOS PARA DOCINHOS */
-        <>
-          {/* Itens Selecionados */}
-          <div>
-            <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-              Docinhos do Lote ({calculations.candyDetails?.length || 0})
-            </h4>
-            <div className="space-y-2">
-              {calculations.candyDetails?.map((item, idx) => {
-                const marginInfo = calculateProfitMargin(item.totalCost || 0, item.totalRevenue || 0);
-
-                return (
-                  <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                    <div className="flex-1">
-                      <span className="text-white font-medium text-sm">{item.candy.name}</span>
-                      <div className="text-white/60 text-xs">
-                        {item.quantity} un • R$ {(item.totalCost / item.quantity).toFixed(2)}/un • {item.orderNumber}
-                      </div>
-                      <div className="text-xs space-y-1 mt-1">
-                        <div className="flex justify-between">
-                          <span className="text-orange-400">Materiais:</span>
-                          <span className="text-orange-300">R$ {(item.materialCost || 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-purple-400">Tempo:</span>
-                          <span className="text-purple-300">R$ {(item.timeCost || 0).toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="text-xs text-purple-400 mt-1">
-                        Margem: {marginInfo.profitMargin}% (Custo: {marginInfo.costMargin}%)
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-green-400 font-semibold text-sm">
-                        R$ {(item.totalRevenue || 0).toFixed(2)}
-                      </div>
-                      <div className="text-green-300 text-xs">
-                        Lucro: R$ {(item.totalProfit || 0).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Massas Agrupadas para Docinhos */}
+        /* RESULTADOS PARA BOLOS - DETALHADO */
+        <div className="space-y-6">
+          {/* Massas dos Bolos */}
           {Object.keys(calculations.massGroups).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Massas Utilizadas ({Object.keys(calculations.massGroups).length})
-              </h4>
-              <div className="space-y-3">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-yellow-50 p-4 border-b border-yellow-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  🎂 Massas dos Bolos ({Object.keys(calculations.massGroups).length})
+                </h2>
+              </div>
+              <div className="p-4 space-y-6">
                 {Object.entries(calculations.massGroups).map(([massName, massData]) => {
                   const ingredients = calculateMassIngredients(massData.mass, massData.totalGrams)
                   const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
 
                   return (
-                    <div key={massName} className="p-3 rounded-lg bg-white/5">
-                      <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
-                      <p className="text-white/60 text-xs mb-2">
-                        Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
-                      </p>
-
-                      {validIngredients.length > 0 ? (
+                    <div key={massName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-4">
                         <div>
-                          <p className="text-white/60 text-xs mb-1">Ingredientes necessários:</p>
-                          <div className="space-y-1">
+                          <h3 className="font-bold text-lg text-gray-900">{massName}</h3>
+                          <p className="text-gray-600 text-sm">
+                            Total necessário: <span className="font-bold text-blue-700">{(massData.totalGrams || 0).toFixed(0)}g</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Bolos que usam esta massa:</p>
+                          <p className="font-medium text-gray-800">{massData.cakes.length} tipo(s)</p>
+                        </div>
+                      </div>
+
+                      {/* Detalhes dos bolos que usam esta massa */}
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-800 mb-2 text-sm">📋 Bolos específicos:</h4>
+                        <div className="space-y-2">
+                          {massData.cakes.map((cakeItem, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                              <div>
+                                <span className="font-medium text-gray-900">{cakeItem.cake.name}</span>
+                                <span className="text-gray-500 text-xs ml-2">({cakeItem.orderNumber})</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm">
+                                  <span className="text-gray-600">{cakeItem.quantity} unidades</span>
+                                </div>
+                                <div className="text-sm font-semibold text-blue-700">
+                                  {cakeItem.gramsPerUnit}g/un • Total: {cakeItem.grams.toFixed(0)}g
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Ingredientes necessários para esta massa */}
+                      {validIngredients.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-gray-800 mb-2 text-sm">🧾 Ingredientes para esta massa:</h4>
+                          <div className="grid grid-cols-2 gap-2">
                             {validIngredients.map(([productName, data]) => (
-                              <div key={productName} className="flex justify-between text-xs">
-                                <span className="text-white">{productName}</span>
-                                <span className="text-green-300 font-semibold">
+                              <div key={productName} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                                <span className="font-medium text-gray-900">{productName}</span>
+                                <span className="font-bold text-green-700">
                                   {data.unit === 'un'
                                     ? `${data.quantity} ${data.unit}`
                                     : `${data.quantity}${data.unit}`
@@ -1463,10 +1374,6 @@ export default function CalculatorModal({
                             ))}
                           </div>
                         </div>
-                      ) : (
-                        <p className="text-white/40 text-xs text-center py-1">
-                          Quantidades muito pequenas após arredondamento
-                        </p>
                       )}
                     </div>
                   )
@@ -1475,18 +1382,97 @@ export default function CalculatorModal({
             </div>
           )}
 
-          {/* Extras e Insumos para Docinhos */}
+          {/* Coberturas dos Bolos */}
+          {calculations.frostingGroups && Object.keys(calculations.frostingGroups).length > 0 && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-pink-50 p-4 border-b border-pink-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  🍦 Coberturas dos Bolos ({Object.keys(calculations.frostingGroups).length})
+                </h2>
+              </div>
+              <div className="p-4 space-y-6">
+                {Object.entries(calculations.frostingGroups).map(([frostingName, frostingData]) => {
+                  const ingredients = calculateFrostingIngredients(frostingData.frosting, frostingData.totalGrams)
+                  const validIngredients = Object.entries(ingredients).filter(([_, data]) => data.quantity > 0)
+
+                  return (
+                    <div key={frostingName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg text-gray-900">{frostingName}</h3>
+                          <p className="text-gray-600 text-sm">
+                            Total necessário: <span className="font-bold text-blue-700">{(frostingData.totalGrams || 0).toFixed(0)}g</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Bolos que usam esta cobertura:</p>
+                          <p className="font-medium text-gray-800">{frostingData.cakes.length} tipo(s)</p>
+                        </div>
+                      </div>
+
+                      {/* Detalhes dos bolos que usam esta cobertura */}
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-800 mb-2 text-sm">📋 Bolos específicos:</h4>
+                        <div className="space-y-2">
+                          {frostingData.cakes.map((cakeItem, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                              <div>
+                                <span className="font-medium text-gray-900">{cakeItem.cake.name}</span>
+                                <span className="text-gray-500 text-xs ml-2">({cakeItem.orderNumber})</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm">
+                                  <span className="text-gray-600">{cakeItem.quantity} unidades</span>
+                                </div>
+                                <div className="text-sm font-semibold text-blue-700">
+                                  {cakeItem.gramsPerUnit}g/un • Total: {cakeItem.grams.toFixed(0)}g
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Ingredientes necessários para esta cobertura */}
+                      {validIngredients.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-gray-800 mb-2 text-sm">🧾 Ingredientes para esta cobertura:</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {validIngredients.map(([productName, data]) => (
+                              <div key={productName} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                                <span className="font-medium text-gray-900">{productName}</span>
+                                <span className="font-bold text-green-700">
+                                  {data.unit === 'un'
+                                    ? `${data.quantity} ${data.unit}`
+                                    : `${data.quantity}${data.unit}`
+                                  }
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Extras e Insumos para Bolos */}
           {calculations.extrasGroups && Object.keys(calculations.extrasGroups).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
-              </h4>
-              <div className="space-y-3">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-purple-50 p-4 border-b border-purple-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  🎁 Extras e Insumos ({Object.keys(calculations.extrasGroups).length})
+                </h2>
+              </div>
+              <div className="p-4 space-y-4">
                 {Object.entries(calculations.extrasGroups).map(([productName, extraData]) => (
-                  <div key={productName} className="p-3 rounded-lg bg-white/5">
-                    <div className="flex justify-between items-start mb-2">
-                      <h5 className="font-bold text-white text-sm">{productName}</h5>
-                      <span className="text-green-300 font-semibold text-sm">
+                  <div key={productName} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-gray-900">{productName}</h3>
+                      <span className="font-bold text-green-700 text-lg">
                         {extraData.unit === 'un' 
                           ? `${extraData.totalQuantity} ${extraData.unit}`
                           : `${extraData.totalQuantity}${extraData.unit}`
@@ -1494,18 +1480,20 @@ export default function CalculatorModal({
                       </span>
                     </div>
                     
-                    <p className="text-white/60 text-xs mb-1">Utilizado em:</p>
-                    <div className="space-y-1">
-                      {extraData.candies.map((candyItem, idx) => (
-                        <div key={idx} className="flex justify-between text-xs text-white/60">
-                          <span>{candyItem.candy.name}</span>
-                          <span>
-                            {candyItem.quantity} un • 
-                            {extraData.unit === 'un' 
-                              ? ` ${candyItem.totalQuantity} ${extraData.unit}`
-                              : ` ${candyItem.totalQuantity}${extraData.unit}`
-                            }
-                          </span>
+                    <h4 className="font-semibold text-gray-800 mb-2 text-sm">Utilizado nos bolos:</h4>
+                    <div className="space-y-2">
+                      {extraData.cakes.map((cakeItem, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-gray-100">
+                          <span className="font-medium text-gray-900">{cakeItem.cake.name}</span>
+                          <div className="text-right">
+                            <div className="text-sm text-gray-600">{cakeItem.quantity} unidades</div>
+                            <div className="text-sm font-semibold text-blue-700">
+                              {extraData.unit === 'un' 
+                                ? `${cakeItem.totalQuantity} ${extraData.unit}`
+                                : `${cakeItem.totalQuantity}${extraData.unit}`
+                              }
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1515,35 +1503,39 @@ export default function CalculatorModal({
             </div>
           )}
 
-          {/* Ingredientes Consolidados para Docinhos */}
+          {/* Ingredientes Consolidados */}
           {calculations.consolidatedIngredients && Object.keys(calculations.consolidatedIngredients).length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold text-sm mb-2 border-b border-white/20 pb-1">
-                Ingredientes Consolidados ({Object.keys(calculations.consolidatedIngredients).length})
-              </h4>
-              <div className="space-y-2">
-                {Object.entries(calculations.consolidatedIngredients).map(([productName, data]) => (
-                  <div key={productName} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
-                    <span className="text-white font-medium text-sm">{productName}</span>
-                    <span className="text-green-300 font-semibold text-sm">
-                      {data.unit === 'un'
-                        ? `${data.quantity} ${data.unit}`
-                        : `${data.quantity}${data.unit}`
-                      }
-                    </span>
-                  </div>
-                ))}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-green-50 p-4 border-b border-green-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  📦 Ingredientes Consolidados ({Object.keys(calculations.consolidatedIngredients).length})
+                </h2>
+                <p className="text-gray-600 text-sm mt-1">Soma total de todos os ingredientes necessários</p>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(calculations.consolidatedIngredients).map(([productName, data]) => (
+                    <div key={productName} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
+                      <span className="font-medium text-gray-900">{productName}</span>
+                      <span className="font-bold text-green-700">
+                        {data.unit === 'un'
+                          ? `${data.quantity} ${data.unit}`
+                          : `${data.quantity}${data.unit}`
+                        }
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* Informação sobre unidades */}
-      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-        <p className="text-blue-300 text-xs text-center">
-          💡 <strong>Sistema de unidades:</strong> Kg → g, L → ml, Unidades mantidas como "un"
-        </p>
+      {/* Rodapé */}
+      <div className="border-t border-gray-300 pt-4 mt-6 text-center text-gray-500 text-sm">
+        <p>💡 Sistema gerado automaticamente • Quantidades em gramas por unidade especificadas</p>
+        <p className="mt-1">Total de itens selecionados: {Object.keys(selectedItems).length}</p>
       </div>
     </div>
   )
@@ -2010,10 +2002,27 @@ export default function CalculatorModal({
 
                               return (
                                 <div key={massName} className="p-3 rounded-lg bg-white/5">
-                                  <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
-                                  <p className="text-white/60 text-xs mb-2">
-                                    Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
-                                  </p>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h5 className="font-bold text-white text-sm">{massName}</h5>
+                                    <span className="text-yellow-300 font-bold text-sm">
+                                      Total: {(massData.totalGrams || 0).toFixed(0)}g
+                                    </span>
+                                  </div>
+
+                                  {/* Detalhes dos bolos que usam esta massa */}
+                                  <div className="mb-3">
+                                    <p className="text-white/60 text-xs mb-1">Bolos que usam esta massa:</p>
+                                    <div className="space-y-1">
+                                      {massData.cakes.map((cakeItem, idx) => (
+                                        <div key={idx} className="flex justify-between text-xs text-white/60">
+                                          <span>{cakeItem.cake.name}</span>
+                                          <span className="text-yellow-300">
+                                            {cakeItem.quantity} un • {cakeItem.gramsPerUnit}g/un
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
 
                                   {validIngredients.length > 0 ? (
                                     <div>
@@ -2069,10 +2078,27 @@ export default function CalculatorModal({
 
                               return (
                                 <div key={frostingName} className="p-3 rounded-lg bg-white/5">
-                                  <h5 className="font-bold text-white text-sm mb-2">{frostingName}</h5>
-                                  <p className="text-white/60 text-xs mb-2">
-                                    Total necessário: <strong>{(frostingData.totalGrams || 0).toFixed(2)}g</strong>
-                                  </p>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h5 className="font-bold text-white text-sm">{frostingName}</h5>
+                                    <span className="text-yellow-300 font-bold text-sm">
+                                      Total: {(frostingData.totalGrams || 0).toFixed(0)}g
+                                    </span>
+                                  </div>
+
+                                  {/* Detalhes dos bolos que usam esta cobertura */}
+                                  <div className="mb-3">
+                                    <p className="text-white/60 text-xs mb-1">Bolos que usam esta cobertura:</p>
+                                    <div className="space-y-1">
+                                      {frostingData.cakes.map((cakeItem, idx) => (
+                                        <div key={idx} className="flex justify-between text-xs text-white/60">
+                                          <span>{cakeItem.cake.name}</span>
+                                          <span className="text-yellow-300">
+                                            {cakeItem.quantity} un • {cakeItem.gramsPerUnit}g/un
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
 
                                   {validIngredients.length > 0 ? (
                                     <div>
@@ -2273,10 +2299,27 @@ export default function CalculatorModal({
 
                               return (
                                 <div key={massName} className="p-3 rounded-lg bg-white/5">
-                                  <h5 className="font-bold text-white text-sm mb-2">{massName}</h5>
-                                  <p className="text-white/60 text-xs mb-2">
-                                    Total necessário: <strong>{(massData.totalGrams || 0).toFixed(2)}g</strong>
-                                  </p>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h5 className="font-bold text-white text-sm">{massName}</h5>
+                                    <span className="text-yellow-300 font-bold text-sm">
+                                      Total: {(massData.totalGrams || 0).toFixed(0)}g
+                                    </span>
+                                  </div>
+
+                                  {/* Detalhes dos docinhos que usam esta massa */}
+                                  <div className="mb-3">
+                                    <p className="text-white/60 text-xs mb-1">Docinhos que usam esta massa:</p>
+                                    <div className="space-y-1">
+                                      {massData.candies.map((candyItem, idx) => (
+                                        <div key={idx} className="flex justify-between text-xs text-white/60">
+                                          <span>{candyItem.candy.name}</span>
+                                          <span className="text-yellow-300">
+                                            {candyItem.quantity} un • {candyItem.gramsPerUnit}g/un
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
 
                                   {validIngredients.length > 0 ? (
                                     <div>
@@ -2404,7 +2447,7 @@ export default function CalculatorModal({
                 </div>
               </div>
 
-              {/* Componente oculto para o PNG - sempre expandido */}
+              {/* Componente oculto para o PNG - versão completa com tema claro */}
               {calculations && (
                 <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
                   <div ref={resultsRef}>

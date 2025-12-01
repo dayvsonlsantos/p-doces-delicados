@@ -1,3 +1,4 @@
+// pages/orders/index.js
 import Layout from '../../components/Layout/Layout'
 import GlassCard from '../../components/UI/GlassCard'
 import GlassButton from '../../components/UI/GlassButton'
@@ -216,9 +217,38 @@ export default function Orders() {
     return matchesSearch && matchesStatus && matchesType && matchesDate
   })
 
-  // Calcular totais
+  // Calcular totais COM DESCONTO
   const getOrderTotal = (order) => {
-    return order.costBreakdown?.salePrice || 0
+    // Prioridade 1: Usar o finalPrice calculado que já considera o desconto
+    if (order.finalPrice !== undefined && order.finalPrice !== null) {
+      return order.finalPrice;
+    }
+    
+    // Prioridade 2: Calcular o preço final com desconto baseado nos dados da encomenda
+    if (order.costBreakdown?.salePrice) {
+      const basePrice = order.costBreakdown.salePrice;
+      
+      // Aplicar desconto se existir
+      if (order.discount && order.discount > 0) {
+        if (order.discountType === 'percentage') {
+          // Desconto percentual
+          return basePrice * (1 - order.discount / 100);
+        } else {
+          // Desconto em valor fixo
+          return Math.max(0, basePrice - order.discount);
+        }
+      }
+      
+      return basePrice;
+    }
+    
+    // Fallback: Usar salePrice ou 0
+    return order.costBreakdown?.salePrice || 0;
+  }
+
+  // Função para mostrar o valor original riscado quando há desconto
+  const getOriginalPrice = (order) => {
+    return order.costBreakdown?.salePrice || 0;
   }
 
   const getStatusColor = (status) => {
@@ -239,6 +269,23 @@ export default function Orders() {
       'partial': 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
     }
     return colors[status] || 'bg-gray-500/20 text-gray-300 border-gray-500/30'
+  }
+
+  // Calcular lucro considerando desconto
+  const calculateProfit = (order) => {
+    const finalPrice = getOrderTotal(order);
+    const cost = order.costBreakdown?.totalCost || 0;
+    return finalPrice - cost;
+  }
+
+  // Calcular margem de lucro considerando desconto
+  const calculateProfitMargin = (order) => {
+    const finalPrice = getOrderTotal(order);
+    const cost = order.costBreakdown?.totalCost || 0;
+    if (cost > 0) {
+      return ((finalPrice - cost) / cost) * 100;
+    }
+    return 0;
   }
 
   return (
@@ -301,7 +348,7 @@ export default function Orders() {
 
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
+            onChange={(e) => handleTypeFilterChange(e.target.value)}
             className="h-12 glass-input px-4 bg-white/10 border border-white/20 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
           >
             <option value="docinhos">🍬 Docinhos</option>
@@ -340,106 +387,139 @@ export default function Orders() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredOrders.map((order) => (
-              <div key={order._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
-                <div className="flex items-start justify-between flex-col md:flex-row gap-4">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
-                      <FaUser className="w-5 h-5" />
-                    </div>
+            {filteredOrders.map((order) => {
+              const orderTotal = getOrderTotal(order);
+              const originalPrice = getOriginalPrice(order);
+              const profit = calculateProfit(order);
+              const profitMargin = calculateProfitMargin(order);
+              const hasDiscount = order.discount && order.discount > 0;
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between flex-col md:flex-row gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-white text-lg truncate">
-                              {order.customerName}
-                            </h3>
-                            <span className="text-white/60 text-sm">
-                              #{order.orderNumber}
-                            </span>
-                          </div>
+              return (
+                <div key={order._id} className="p-4 md:p-6 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors duration-300">
+                  <div className="flex items-start justify-between flex-col md:flex-row gap-4">
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
+                        <FaUser className="w-5 h-5" />
+                      </div>
 
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            <span className={`px-2 py-1 rounded-full text-xs border ${getStatusColor(order.status)}`}>
-                              {order.status}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs border ${getPaymentStatusColor(order.paymentStatus)}`}>
-                              {order.paymentStatus === 'pending' ? 'A Pagar' :
-                                order.paymentStatus === 'paid' ? 'Pago' : 'Parcial'}
-                            </span>
-                            <span className="px-2 py-1 rounded-full text-xs bg-white/10 text-white/80 border border-white/20">
-                              {order.type}
-                            </span>
-                          </div>
-
-                          <div className="text-white/60 text-sm space-y-1">
-                            <div className="flex items-center gap-2">
-                              <FaCalendar className="w-3 h-3" />
-                              <span>Entrega: {new Date(order.deliveryDate).toLocaleDateString('pt-BR')}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between flex-col md:flex-row gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-semibold text-white text-lg truncate">
+                                {order.customerName}
+                              </h3>
+                              <span className="text-white/60 text-sm">
+                                #{order.orderNumber}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <FaMoneyBillWave className="w-3 h-3" />
-                              <span>Total: R$ {getOrderTotal(order).toFixed(2)}</span>
-                            </div>
-                          </div>
 
-                          {/* Itens da encomenda */}
-                          {order.items && order.items.length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-white/60 text-sm mb-2">Itens:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {order.items.slice(0, 3).map((item, index) => (
-                                  <span key={index} className="px-2 py-1 bg-white/5 rounded-lg text-xs text-white/80">
-                                    {item.itemName} ({item.quantity}x)
-                                  </span>
-                                ))}
-                                {order.items.length > 3 && (
-                                  <span className="px-2 py-1 bg-white/5 rounded-lg text-xs text-white/60">
-                                    +{order.items.length - 3} mais
-                                  </span>
-                                )}
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              <span className={`px-2 py-1 rounded-full text-xs border ${getStatusColor(order.status)}`}>
+                                {order.status}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs border ${getPaymentStatusColor(order.paymentStatus)}`}>
+                                {order.paymentStatus === 'pending' ? 'A Pagar' :
+                                  order.paymentStatus === 'paid' ? 'Pago' : 'Parcial'}
+                              </span>
+                              <span className="px-2 py-1 rounded-full text-xs bg-white/10 text-white/80 border border-white/20">
+                                {order.type}
+                              </span>
+                              {hasDiscount && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                  {order.discountType === 'percentage' 
+                                    ? `-${order.discount}%` 
+                                    : `-R$ ${order.discount}`}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="text-white/60 text-sm space-y-1">
+                              <div className="flex items-center gap-2">
+                                <FaCalendar className="w-3 h-3" />
+                                <span>Entrega: {new Date(order.deliveryDate).toLocaleDateString('pt-BR')}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <FaMoneyBillWave className="w-3 h-3" />
+                                <span className="flex items-center gap-1">
+                                  Total: R$ {orderTotal.toFixed(2)}
+                                  {hasDiscount && (
+                                    <span className="text-white/40 line-through text-xs">
+                                      R$ {originalPrice.toFixed(2)}
+                                    </span>
+                                  )}
+                                </span>
                               </div>
                             </div>
-                          )}
-                        </div>
 
-                        {/* Valores */}
-                        <div className="text-right">
-                          <div className="text-green-400 font-bold text-xl mb-2">
-                            R$ {getOrderTotal(order).toFixed(2)}
+                            {/* Itens da encomenda */}
+                            {order.items && order.items.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-white/60 text-sm mb-2">Itens:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {order.items.slice(0, 3).map((item, index) => (
+                                    <span key={index} className="px-2 py-1 bg-white/5 rounded-lg text-xs text-white/80">
+                                      {item.itemName} ({item.quantity}x)
+                                    </span>
+                                  ))}
+                                  {order.items.length > 3 && (
+                                    <span className="px-2 py-1 bg-white/5 rounded-lg text-xs text-white/60">
+                                      +{order.items.length - 3} mais
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          {order.costBreakdown && (
-                            <div className="text-white/60 text-sm space-y-1">
-                              <div>Custo: R$ {order.costBreakdown.totalCost?.toFixed(2)}</div>
-                              <div>Lucro: R$ {order.costBreakdown.profit?.toFixed(2)}</div>
-                              <div>Margem: {order.costBreakdown.profitMargin?.toFixed(1)}%</div>
+
+                          {/* Valores */}
+                          <div className="text-right">
+                            <div className="mb-2">
+                              <div className={`text-green-400 font-bold text-xl ${hasDiscount ? 'mb-1' : ''}`}>
+                                R$ {orderTotal.toFixed(2)}
+                              </div>
+                              {hasDiscount && (
+                                <div className="text-white/40 text-sm line-through mb-2">
+                                  R$ {originalPrice.toFixed(2)}
+                                </div>
+                              )}
                             </div>
-                          )}
+                            {order.costBreakdown && (
+                              <div className="text-white/60 text-sm space-y-1">
+                                <div>Custo: R$ {(order.costBreakdown.totalCost || 0).toFixed(2)}</div>
+                                <div className={profit >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                  Lucro: R$ {profit.toFixed(2)}
+                                </div>
+                                <div className={profitMargin >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                  Margem: {profitMargin.toFixed(1)}%
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <GlassButton
-                      variant="secondary"
-                      onClick={() => handleEdit(order)}
-                      className="px-3 py-2 text-sm"
-                    >
-                      <FaEdit className="w-3 h-3" />
-                    </GlassButton>
-                    <GlassButton
-                      variant="danger"
-                      onClick={() => handleDelete(order._id)}
-                      className="px-3 py-2 text-sm"
-                    >
-                      <FaTrash className="w-3 h-3" />
-                    </GlassButton>
+                    <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                      <GlassButton
+                        variant="secondary"
+                        onClick={() => handleEdit(order)}
+                        className="px-3 py-2 text-sm"
+                      >
+                        <FaEdit className="w-3 h-3" />
+                      </GlassButton>
+                      <GlassButton
+                        variant="danger"
+                        onClick={() => handleDelete(order._id)}
+                        className="px-3 py-2 text-sm"
+                      >
+                        <FaTrash className="w-3 h-3" />
+                      </GlassButton>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </GlassCard>
